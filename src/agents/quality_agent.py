@@ -51,7 +51,7 @@ class QualityAgent(BaseAgent):
         if runs:
             ra_text = f"{ra_range[0]:.2f}~{ra_range[1]:.2f}" if len(runs) > 1 else f"{ra_range[0]:.2f}"
             reasons.append(
-                f"참고: {SOURCE}에서 VB {vb:.2f}±{th['reference_vb_window_mm']} mm인 실험 {len(runs)}개의 Ra {ra_text} µm (가공조건에 따라 다름)"
+                f"참고: {SOURCE}의 건식 가공 중 VB {vb:.2f}±{th['reference_vb_window_mm']} mm인 실험 {len(runs)}개의 Ra {ra_text} µm (가공조건에 따라 다름)"
             )
 
         return QualityReport(

@@ -45,13 +45,23 @@ def load_reference(path: Path = REFERENCE_PATH) -> tuple[ReferenceRun, ...]:
         )
 
 
-def similar_runs(vb_mm: float, window_mm: float) -> list[ReferenceRun]:
-    return [r for r in load_reference() if abs(r.vb_mm - vb_mm) <= window_mm]
+# QIT-CEMC는 건식(Dry) 가공이므로 같은 냉각 조건의 실험만 근거로 쓴다
+DEFAULT_COOLING_MODE = "Dry"
 
 
-def reference_ra_range(vb_mm: float, window_mm: float) -> tuple[float, float] | None:
+def similar_runs(vb_mm: float, window_mm: float, cooling_mode: str | None = DEFAULT_COOLING_MODE) -> list[ReferenceRun]:
+    return [
+        r
+        for r in load_reference()
+        if abs(r.vb_mm - vb_mm) <= window_mm and (cooling_mode is None or r.cooling_mode == cooling_mode)
+    ]
+
+
+def reference_ra_range(
+    vb_mm: float, window_mm: float, cooling_mode: str | None = DEFAULT_COOLING_MODE
+) -> tuple[float, float] | None:
     """VB가 비슷한 참조 실험들의 Ra 최소~최대. 해당 실험이 없으면 None."""
-    runs = similar_runs(vb_mm, window_mm)
+    runs = similar_runs(vb_mm, window_mm, cooling_mode)
     if not runs:
         return None
     return min(r.ra_um for r in runs), max(r.ra_um for r in runs)
