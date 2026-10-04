@@ -1,0 +1,7 @@
+Test_ID,목적,Wear_State,Quality_Risk,Scenario_ID,Inspection_Result,기대 확인 포인트,Expected_Action,Change_Note
+TC01,정상 마모,4개 날 차이 작음 / 증가 완만,Low,S01,Not checked,계속 사용 경로가 가능한지,CONTINUE,
+TC02,특정 날 편마모,Edge 3만 크게 증가,Medium,S07,Not checked,특정 날 검사 경로가 가능한지,INSPECT_EDGE,
+TC03,고가 부품 + 고위험,최대 VBmax 높음 / 편차 큼,High,S08,Not checked,비용까지 고려해 보수적 행동을 선택하는지,REPLACE_NOW,"원본 S13은 부품가치 300만원(최저)이라 '고가 부품'과 맞지 않아 S08(2,500만원)로 변경"
+TC04,공구 재고 없음,주의 수준 마모,Medium,S10,Not checked,재고 부족 상황에서 다른 행동을 선택하는지,REPLACE_AFTER_JOB,원본 S18은 재고 2개라 '재고 없음'과 맞지 않아 S10(재고 0)으로 변경
+TC05,검사 피드백,Edge 2 이상 증가,High,S22,손상 확인,검사 결과를 반영해 판단을 갱신하는지,INSPECT_EDGE → REPLACE_NOW,
+TC06,센서 입력 이상,필수 센서 누락,Unknown,S05,Not checked,재측정/데이터 요청 경로가 동작하는지,REMEASURE,

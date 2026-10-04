@@ -20,6 +20,10 @@ def apply_inspection(inspection: InspectionResult, wear: WearReport, state: Tool
         edges[inspection.edge_id - 1],
         vb_max_mm=inspection.vb_measured_mm,
         uncertainty_mm=MEASURED_UNCERTAINTY_MM,
+        # 예측 대신 실측값 기준으로 직전 Cycle 대비 증가량을 다시 계산
+        increment_mm=edges[inspection.edge_id - 1].increment_mm
+        + inspection.vb_measured_mm
+        - edges[inspection.edge_id - 1].vb_max_mm,
         measured=True,
     )
     return replace(wear, edges=edges)

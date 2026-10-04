@@ -1,0 +1,25 @@
+﻿Scenario_ID,Remaining_Parts,Process_Progress_pct,Due_Slack_min,Production_Priority,Spare_Tool_Available,Inspection_Available,Data_Type,Assumption_Notes
+S01,1,10,30,Low,No,No,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S02,2,55,720,High,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S03,3,92,360,Low,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S04,5,25,240,High,No,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S05,8,70,120,Low,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S06,12,98,60,High,Yes,No,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S07,20,40,30,Low,No,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S08,30,85,720,High,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S09,1,10,360,Low,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S10,2,55,240,High,No,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S11,3,92,120,Low,Yes,No,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S12,5,25,60,High,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S13,8,70,30,Low,No,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S14,12,98,720,High,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S15,20,40,360,Low,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S16,30,85,240,High,No,No,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S17,1,10,120,Low,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S18,2,55,60,High,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S19,3,92,30,Low,No,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S20,5,25,720,High,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S21,8,70,360,Low,Yes,No,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S22,12,98,240,High,No,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S23,20,40,120,Low,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.
+S24,30,85,60,High,Yes,Yes,SYNTHETIC_MVP,실제 MES 데이터가 없는 MVP 단계에서 Agent 의사결정 시나리오 테스트용.

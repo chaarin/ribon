@@ -1,34 +1,35 @@
 # 의사결정에 쓰이는 모든 기준값.
-# 현재 값은 초기 가정값이며, 근거(논문·규격·현장값)가 확보되면 출처와 함께 갱신한다.
+# 출처가 있는 값은 출처를 적고, 나머지는 가정값으로 표시한다. 근거가 확보되면 갱신한다.
 
 wear:
-  vb_limit_mm: 0.3               # 교체 한계 VBmax. ISO 8688-2의 일반적 공구수명 기준(VB 0.3 mm)을 초기값으로 사용
-  uneven_index_threshold: 0.3    # 편마모 지수 (max-min)/mean 이 이 값 이상이면 편마모로 판단
-  uneven_min_vb_mm: 0.05         # 평균 VB가 이 값 미만이면 편마모를 판단하지 않음 (초기 마모 구간의 노이즈 방지)
-  inspect_uncertainty_mm: 0.02   # 가장 많이 닳은 날의 예측 불확실성이 이 값 이상이면 검사 후보
-  reinspect_delta_mm: 0.05       # 실측한 날은 그 뒤 예측 VB가 이만큼 늘어야 다시 검사
-  remeasure_uncertainty_mm: 0.08 # 4날 평균 불확실성이 이 값 이상이면 센서 재측정
-  min_signal_quality: 0.8        # 센서 신호 품질(0~1)이 이 값 미만이면 센서 재측정
+  vb_limit_mm: 0.3               # 교체 한계 VBmax. ISO 8688-2의 일반적 공구수명 기준(VB 0.3 mm)
+  uneven_index_threshold: 0.3    # 편마모 지수 (max-min)/mean 이 이 값 이상이면 편마모 (가정값)
+  uneven_min_vb_mm: 0.05         # 평균 VB가 이 값 미만이면 편마모를 판단하지 않음 (초기 마모 구간의 노이즈 방지, 가정값)
+  inspect_uncertainty_mm: 0.02   # 가장 많이 닳은 날의 예측 불확실성이 이 값 이상이면 검사 후보 (가정값)
+  reinspect_delta_mm: 0.05       # 실측한 날은 그 뒤 예측 VB가 이만큼 늘어야 다시 검사 (가정값)
+  remeasure_uncertainty_mm: 0.08 # 4날 평균 불확실성이 이 값 이상이면 센서 재측정 (가정값)
+  min_signal_quality: 0.8        # 가장 나쁜 채널의 유효 샘플 비율이 이 값 미만이면 센서 재측정 (가정값)
 
 quality:
-  ra_limits_um:                  # 추정 Ra 기준 위험 등급 (가정값, 도면 요구 조도에 맞춰 조정)
-    medium: 0.8
-    high: 1.6
+  # 품질 위험은 VB→Ra 추정이 아니라 마모 상태로 판단한다.
+  # 참조 데이터(Nguyen et al. 2024, L27)에서 VB와 Ra의 상관이 거의 없어(r≈0.06) Ra 추정 곡선을 쓸 근거가 없기 때문.
+  vb_medium_mm: 0.2              # Li et al. (2018): Ti-6Al-4V 고속가공에서 VB < 0.2 mm일 때 과도한 표면 결함을 피함 (해당 실험의 관찰값)
+  vb_high_mm: 0.3                # ISO 8688-2 공구수명 기준
+  rapid_increment_mm: 0.02       # 직전 Cycle 대비 VB 증가량이 이 값 이상이면 급속 마모 (MEDIUM 이상에서 위험 한 단계 상향, 가정값)
+  reference_vb_window_mm: 0.03   # 참조 데이터에서 현재 VB ± 이 범위의 실험을 찾아 Ra 범위를 근거로 제시
 
 economics:
-  defect_probability:            # 품질 위험 등급별 부품 1개당 불량 확률 (가정값)
+  # 위험 등급별 부품 1개당 불량 확률 (가정값). 비용은 새 공구(LOW) 대비 '추가' 불량 확률로 계산한다.
+  defect_probability:
     LOW: 0.01
     MEDIUM: 0.05
     HIGH: 0.30
-  breakage_probability:          # 품질 위험 등급별 공정 중 공구 파손 확률 (가정값)
-    LOW: 0.001
-    MEDIUM: 0.01
-    HIGH: 0.05
-  pressure_slack_ratio:          # 납기 여유 = 남은 납기 시간 / 남은 작업 시간
-    high: 1.2                    # 이 값 미만이면 생산 압박 HIGH
-    medium: 2.0                  # 이 값 미만이면 생산 압박 MEDIUM
-  after_job_downtime_ratio: 0.5   # 공정 후 교체는 작업 전환(셋업)과 겹쳐 정지 비용이 이 비율로 줄어듦 (가정값)
-  downtime_multiplier:           # 생산 압박이 클수록 공정 중 정지 비용이 커짐
+  pressure_slack_min:            # 납기 여유 시간(분) 기준 생산 압박
+    high: 60                     # 이 값 미만이면 HIGH
+    medium: 240                  # 이 값 미만이면 MEDIUM
+  # Production_Priority가 High면 생산 압박을 한 단계 올린다
+  after_job_downtime_ratio: 0.5  # 공정 후 교체는 작업 전환(셋업)과 겹쳐 정지 비용이 이 비율로 줄어듦 (가정값)
+  downtime_multiplier:           # 생산 압박이 클수록 공정 중 정지 비용이 커짐 (가정값)
     LOW: 1.0
     MEDIUM: 1.5
     HIGH: 2.0

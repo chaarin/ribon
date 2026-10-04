@@ -3,13 +3,13 @@ import pytest
 from src.data.synthetic import generate_tool_run
 from src.orchestrator.pipeline import MaintenancePipeline
 from src.schemas import Action, InspectionResult
-from src.simulation.production_sim import default_context
+from src.simulation.production_sim import get_scenario
 
 
 def test_feedback_corrects_prediction_and_reruns_decision():
     pipeline = MaintenancePipeline()
     windows = generate_tool_run("T01", n_cycles=10)
-    ctx = default_context()
+    ctx = get_scenario()
 
     decision = None
     for window in windows:
@@ -36,7 +36,7 @@ def test_feedback_corrects_prediction_and_reruns_decision():
 
 def test_full_run_ends_with_replacement():
     pipeline = MaintenancePipeline()
-    ctx = default_context()
+    ctx = get_scenario()
     actions = []
     for window in generate_tool_run("T01", n_cycles=25):
         decision = pipeline.run_cycle(window, ctx)

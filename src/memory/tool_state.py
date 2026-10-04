@@ -16,7 +16,6 @@ class ToolStateStore:
             edge_state.vb_mm = edge.vb_max_mm
             edge_state.raw_pred_mm = edge.raw_vb_mm
             edge_state.uncertainty_mm = edge.uncertainty_mm
-            edge_state.wear_rate_mm_min = edge.wear_rate_mm_min
             edge_state.measured = False
         state.cut_time_min = cut_time_min
 

@@ -1,13 +1,15 @@
-"""데모: 합성 데이터로 공구 1개의 전체 수명 동안 의사결정 흐름을 실행한다.
+"""데모: 합성 센서 데이터와 시뮬레이션 시나리오로 공구 1개의 의사결정 흐름을 실행한다.
 
-실행: python -m src.main
+실행: python -m src.main [--scenario S15] [--cycles 25]
 """
+import argparse
+
 from src.config.settings import OUTPUT_DIR
 from src.data.synthetic import generate_tool_run
 from src.memory.history_store import HistoryStore
 from src.orchestrator.pipeline import MaintenancePipeline
 from src.schemas import Action, Decision, InspectionResult
-from src.simulation.production_sim import advance, default_context
+from src.simulation.production_sim import DEFAULT_SCENARIO, advance, get_scenario
 
 
 def print_decision(decision: Decision, prefix: str = "") -> None:
@@ -16,11 +18,12 @@ def print_decision(decision: Decision, prefix: str = "") -> None:
     print(f"{prefix}    → {decision.reasons[0]}")
 
 
-def run_demo(n_cycles: int = 25) -> None:
+def run_demo(scenario_id: str = DEFAULT_SCENARIO, n_cycles: int = 25) -> None:
     history_path = OUTPUT_DIR / "history.jsonl"
     history_path.unlink(missing_ok=True)
     pipeline = MaintenancePipeline(history=HistoryStore(history_path))
-    ctx = default_context()
+    ctx = get_scenario(scenario_id)
+    print(f"시나리오 {scenario_id} (MVP 시뮬레이션 입력) / 합성 센서 데이터\n")
 
     for window in generate_tool_run("T01", n_cycles):
         decision = pipeline.run_cycle(window, ctx)
@@ -31,9 +34,7 @@ def run_demo(n_cycles: int = 25) -> None:
                 # 합성 데이터의 실제 마모값을 현장 실측값으로 사용
                 measured = window.vb_label_mm[decision.target_edge - 1]
                 print(f"    ⤷ 검사 결과: Edge {decision.target_edge} 실측 VBmax {measured:.3f} mm → 재판단")
-                decision = pipeline.apply_feedback(
-                    InspectionResult(window.tool_id, decision.target_edge, measured)
-                )
+                decision = pipeline.apply_feedback(InspectionResult(window.tool_id, decision.target_edge, measured))
             else:
                 print("    ⤷ 센서 재측정 → 재판단")
                 decision = pipeline.run_cycle(window, ctx)
@@ -51,4 +52,8 @@ def run_demo(n_cycles: int = 25) -> None:
 
 
 if __name__ == "__main__":
-    run_demo()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scenario", default=DEFAULT_SCENARIO)
+    parser.add_argument("--cycles", type=int, default=25)
+    args = parser.parse_args()
+    run_demo(args.scenario, args.cycles)

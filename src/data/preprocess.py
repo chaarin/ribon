@@ -18,13 +18,18 @@ def preprocess(window: SensorWindow) -> dict[str, np.ndarray]:
     return cleaned
 
 
-def signal_quality(window: SensorWindow) -> float:
-    """0~1 점수. 기대 채널마다 유효 샘플 비율을 구해 평균낸다 (채널이 없으면 0)."""
-    scores = []
+def channel_quality(window: SensorWindow) -> dict[str, float]:
+    """기대 채널별 유효 샘플 비율 (채널이 없으면 0)."""
+    scores = {}
     for name in SENSOR_CHANNELS:
         signal = window.signals.get(name)
         if signal is None or len(signal) == 0:
-            scores.append(0.0)
+            scores[name] = 0.0
         else:
-            scores.append(float(np.isfinite(np.asarray(signal, dtype=float)).mean()))
-    return float(np.mean(scores))
+            scores[name] = float(np.isfinite(np.asarray(signal, dtype=float)).mean())
+    return scores
+
+
+def signal_quality(window: SensorWindow) -> float:
+    """0~1 점수. 필수 채널이 하나라도 빠지면 판단을 믿을 수 없으므로 가장 나쁜 채널 기준으로 본다."""
+    return min(channel_quality(window).values())

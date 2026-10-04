@@ -1,0 +1,25 @@
+﻿Scenario_ID,Material,Tool_Type,Tool_Price_KRW,Tool_Change_Time_min,Downtime_Cost_per_min_KRW,Part_Value_KRW,Spare_Tool_Stock,Immediate_Change_Cost_KRW,Remaining_Production_Value_KRW,Data_Type,Assumption_Notes
+S01,Ti-6Al-4V,4-flute coated carbide end mill,90000,6,3000,3000000,0,108000,3000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S02,Ti-6Al-4V,4-flute coated carbide end mill,120000,10,9000,25000000,4,210000,375000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S03,Ti-6Al-4V,4-flute coated carbide end mill,150000,15,3000,18000000,2,195000,180000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S04,Ti-6Al-4V,4-flute coated carbide end mill,180000,6,9000,12000000,0,234000,72000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S05,Ti-6Al-4V,4-flute coated carbide end mill,210000,10,3000,8000000,4,240000,32000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S06,Ti-6Al-4V,4-flute coated carbide end mill,240000,15,9000,5000000,2,375000,10000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S07,Ti-6Al-4V,4-flute coated carbide end mill,90000,6,3000,3000000,0,108000,3000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S08,Ti-6Al-4V,4-flute coated carbide end mill,120000,10,9000,25000000,4,210000,375000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S09,Ti-6Al-4V,4-flute coated carbide end mill,150000,15,3000,18000000,2,195000,180000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S10,Ti-6Al-4V,4-flute coated carbide end mill,180000,6,9000,12000000,0,234000,72000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S11,Ti-6Al-4V,4-flute coated carbide end mill,210000,10,3000,8000000,4,240000,32000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S12,Ti-6Al-4V,4-flute coated carbide end mill,240000,15,9000,5000000,2,375000,10000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S13,Ti-6Al-4V,4-flute coated carbide end mill,90000,6,3000,3000000,0,108000,3000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S14,Ti-6Al-4V,4-flute coated carbide end mill,120000,10,9000,25000000,4,210000,375000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S15,Ti-6Al-4V,4-flute coated carbide end mill,150000,15,3000,18000000,2,195000,180000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S16,Ti-6Al-4V,4-flute coated carbide end mill,180000,6,9000,12000000,0,234000,72000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S17,Ti-6Al-4V,4-flute coated carbide end mill,210000,10,3000,8000000,4,240000,32000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S18,Ti-6Al-4V,4-flute coated carbide end mill,240000,15,9000,5000000,2,375000,10000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S19,Ti-6Al-4V,4-flute coated carbide end mill,90000,6,3000,3000000,0,108000,3000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S20,Ti-6Al-4V,4-flute coated carbide end mill,120000,10,9000,25000000,4,210000,375000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S21,Ti-6Al-4V,4-flute coated carbide end mill,150000,15,3000,18000000,2,195000,180000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S22,Ti-6Al-4V,4-flute coated carbide end mill,180000,6,9000,12000000,0,234000,72000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S23,Ti-6Al-4V,4-flute coated carbide end mill,210000,10,3000,8000000,4,240000,32000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
+S24,Ti-6Al-4V,4-flute coated carbide end mill,240000,15,9000,5000000,2,375000,10000000,SYNTHETIC_MVP,팀이 수정 가능한 시뮬레이션 값. 실제 기업 원가/재고 데이터가 아님.
