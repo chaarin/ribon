@@ -46,8 +46,7 @@ const S = {
 
 async function init() {
   S.meta = await api("GET", "/api/presets");
-  renderPresets();
-  selectPreset(S.meta.default);
+  fillDefaults();
   $("#startBtn").onclick = start;
   $("#stepBtn").onclick = () => step().catch(showError);
   $("#playBtn").onclick = togglePlay;
@@ -55,28 +54,15 @@ async function init() {
   $("#truthToggle").onchange = renderWearChart;
   $("#scale").onchange = renderComparison;
   $("#inspForm").onsubmit = submitInspection;
+  $("#customForm").elements.tool_purpose.onchange = () => { if (!S.sid) renderWearChart(); };
   renderWearChart();
   renderSensors();
 }
 
-function renderPresets() {
-  const box = $("#presets");
-  box.innerHTML = "";
-  for (const p of S.meta.presets) {
-    const b = document.createElement("button");
-    b.className = "preset";
-    b.setAttribute("role", "radio");
-    b.dataset.id = p.id;
-    b.innerHTML = `<strong>${p.name}</strong><span>${p.description}</span>`;
-    b.onclick = () => selectPreset(p.id);
-    box.appendChild(b);
-  }
-}
-
-function selectPreset(id) {
-  S.presetId = id;
-  document.querySelectorAll(".preset").forEach((b) => b.setAttribute("aria-checked", b.dataset.id === id));
-  const ctx = S.meta.presets.find((p) => p.id === id).context;
+// 조건 입력란을 기본 상황(정삭 공구 프리셋)의 값으로 채운다
+function fillDefaults() {
+  S.presetId = S.meta.default;
+  const ctx = S.meta.presets.find((p) => p.id === S.presetId).context;
   const f = $("#customForm");
   for (const key of ["tool_purpose", "change_time_min", "tool_stock", "due_slack_min", "production_priority", "process_progress_pct"]) {
     f.elements[key].value = ctx[key];
@@ -108,7 +94,7 @@ async function start() {
     if (!S.truth) S.truth = await api("GET", "/api/truth");
     setControls(true);
     const c = res.context;
-    addLog("시작", `${S.meta.presets.find((p) => p.id === S.presetId).name} · ${purposeLabel(c.tool_purpose)} 공구, 교체 ${c.change_time_min}분, ` +
+    addLog("시작", `${purposeLabel(c.tool_purpose)} 공구, 교체 ${c.change_time_min}분, ` +
       `재고 ${c.tool_stock}개, 납기 여유 ${c.due_slack_min}분, 검사 ${c.inspection_available ? "가능" : "불가"}`);
   } catch (e) {
     showError(e);
@@ -257,7 +243,7 @@ function renderWearChart() {
   const total = S.meta?.total_cycles ?? 68;
   const showTruth = $("#truthToggle").checked && S.truth;
   const ctx = S.records.at(-1)?.context;
-  const purpose = ctx?.tool_purpose ?? S.meta?.presets.find((p) => p.id === S.presetId)?.context.tool_purpose ?? "finishing";
+  const purpose = ctx?.tool_purpose ?? $("#customForm")?.elements.tool_purpose.value ?? "finishing";
   const caution = S.meta?.tool_purposes[purpose]?.caution_vb_mm ?? 0.2;
   const limit = S.meta?.vb_limit_mm ?? 0.3;
 

@@ -21,16 +21,12 @@
 
   <div class="layout">
     <aside class="setup" id="setup">
-      <h2>1. 상황 선택</h2>
-      <div id="presets" class="presets" role="radiogroup" aria-label="시연 프리셋"></div>
-
-      <details id="custom" class="custom">
-        <summary>조건 직접 조정</summary>
-        <form id="customForm" class="form">
+      <h2>1. 조건 설정</h2>
+      <form id="customForm" class="form">
           <label>공구 용도
             <select name="tool_purpose">
-              <option value="finishing">정삭 (주의 0.2 mm, 불량 시 윙 리브 전체 재가공)</option>
-              <option value="roughing">황삭 (주의 0.25 mm, 불량 시 1 Cycle 재가공)</option>
+              <option value="finishing">정삭</option>
+              <option value="roughing">황삭</option>
             </select>
           </label>
           <label>공구 교체 시간 (분) <input name="change_time_min" type="number" min="1" max="120" step="1"></label>
@@ -41,8 +37,7 @@
           </label>
           <label class="check"><input name="inspection_available" type="checkbox"> 현장 검사 가능</label>
           <label>시작 시 윙 리브 진행률 (%) <input name="process_progress_pct" type="number" min="0" max="100" step="10"></label>
-        </form>
-      </details>
+      </form>
 
       <button id="startBtn" class="primary wide">시연 시작</button>
       <p class="hint">윙 리브 1개 = 10 Cycle, Cycle당 절삭 약 8.5분(실측), 검사 1회 5분 (MVP 가정)</p>
