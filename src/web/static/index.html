@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>공구 유지보수 Multi-Agent</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%232563eb'/></svg>">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1>Ti-6Al-4V 윙 리브 · 4날 엔드밀 유지보수 Multi-Agent</h1>
+      <p class="sub">실제 CNC 밀링 기록(QIT-CEMC, 공구 1개 · 68 Cycle)을 한 Cycle씩 재생하며 Agent들이 판단합니다</p>
+    </div>
+    <div class="badges">
+      <span class="badge">센서: 힘/토크 4채널</span>
+      <span class="badge">생산 조건: MVP 시뮬레이션 입력</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="setup" id="setup">
+      <h2>1. 상황 선택</h2>
+      <div id="presets" class="presets" role="radiogroup" aria-label="시연 프리셋"></div>
+
+      <details id="custom" class="custom">
+        <summary>조건 직접 조정</summary>
+        <form id="customForm" class="form">
+          <label>공구 용도
+            <select name="tool_purpose">
+              <option value="finishing">정삭 (주의 0.2 mm, 불량 시 윙 리브 전체 재가공)</option>
+              <option value="roughing">황삭 (주의 0.25 mm, 불량 시 1 Cycle 재가공)</option>
+            </select>
+          </label>
+          <label>공구 교체 시간 (분) <input name="change_time_min" type="number" min="1" max="120" step="1"></label>
+          <label>여분 공구 재고 (개) <input name="tool_stock" type="number" min="0" max="50" step="1"></label>
+          <label>납기 여유 (분) <input name="due_slack_min" type="number" min="0" max="2000" step="5"></label>
+          <label>생산 우선순위
+            <select name="production_priority"><option>Low</option><option>High</option></select>
+          </label>
+          <label class="check"><input name="inspection_available" type="checkbox"> 현장 검사 가능</label>
+          <label>시작 시 윙 리브 진행률 (%) <input name="process_progress_pct" type="number" min="0" max="100" step="10"></label>
+        </form>
+      </details>
+
+      <button id="startBtn" class="primary wide">시연 시작</button>
+      <p class="hint">윙 리브 1개 = 10 Cycle, Cycle당 절삭 약 8.5분(실측), 검사 1회 5분 (MVP 가정)</p>
+    </aside>
+
+    <main class="main">
+      <section class="status card" aria-live="polite">
+        <div class="status-items">
+          <div><span class="k">Cycle</span><span class="v" id="stCycle">–</span></div>
+          <div><span class="k">누적 절삭</span><span class="v" id="stTime">–</span></div>
+          <div><span class="k">윙 리브</span><span class="v" id="stRib">–</span></div>
+          <div class="grow"><span class="k">이 윙 리브 진행률</span>
+            <div class="progress"><div id="stProgress"></div></div></div>
+          <div><span class="k">검사</span><span class="v" id="stInsp">0회</span></div>
+        </div>
+        <div class="controls">
+          <button id="playBtn" disabled>▶ 자동 재생</button>
+          <button id="stepBtn" disabled>다음 Cycle</button>
+          <label class="speed">속도
+            <select id="speed"><option value="1200">느리게</option><option value="600" selected>보통</option><option value="250">빠르게</option></select>
+          </label>
+          <button id="resetBtn" class="ghost" disabled>처음부터</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>최대 날 마모 (VBmax)</h2>
+          <label class="check small"><input type="checkbox" id="truthToggle"> 실제 측정값(정답) 겹쳐 보기</label>
+        </div>
+        <div id="wearChart" class="chart"></div>
+        <div class="legend" id="wearLegend"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>센서 신호 · 힘/토크 출렁임 (Cycle 평균 std)</h2></div>
+        <div id="sensorCharts" class="sensor-grid"></div>
+      </section>
+
+      <section class="agents" id="agents">
+        <article class="card agent" id="agWear"><h3>① Wear Agent · 마모</h3><div class="body empty">시연을 시작하세요</div></article>
+        <article class="card agent" id="agQuality"><h3>② Quality Agent · 품질 위험</h3><div class="body empty">–</div></article>
+        <article class="card agent" id="agEcon"><h3>③ Economics/Production Agent · 손실 시간</h3><div class="body empty">–</div></article>
+        <article class="card agent master" id="agMaster"><h3>④ Master Agent · 최종 결정</h3><div class="body empty">–</div></article>
+      </section>
+
+      <section class="card" id="endCard" hidden>
+        <div class="card-head">
+          <h2>결과 · 같은 공구 기록에서 판단 방식 비교</h2>
+          <label class="speed">불량 확률 가정
+            <select id="scale"><option value="0.5">×0.5</option><option value="1" selected>기본</option><option value="2">×2</option></select>
+          </label>
+        </div>
+        <p id="endSummary" class="end-summary"></p>
+        <div class="table-wrap"><table id="compTable"></table></div>
+        <p class="hint">윙 리브 1개당 손실 = (교체 시간 + 검사 시간 + 불량 기대손실) 을 공구 수명 동안 가공한 윙 리브 수로 나눈 값.
+          '매 Cycle 검사' 방식은 교체할 때까지 매 Cycle 4날을 실측한다고 가정합니다. 공구 1개 기록 기준이며 시간·확률은 MVP 가정입니다.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>판단 기록</h2></div>
+        <ol id="log" class="log"></ol>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="inspDialog">
+    <form method="dialog" id="inspForm">
+      <h2 id="inspTitle">4개 날 검사</h2>
+      <p class="hint" id="inspWhy"></p>
+      <div id="inspInputs" class="insp-grid"></div>
+      <p class="hint">QIT-CEMC에서 실제로 측정한 값이 미리 채워져 있습니다. 값을 바꾸면 다른 현장 상황을 시연할 수 있습니다.</p>
+      <div class="dialog-actions">
+        <button type="submit" class="primary" id="inspSubmit">실측값 반영하고 재판단</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

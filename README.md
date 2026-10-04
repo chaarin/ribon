@@ -9,7 +9,8 @@ Ti-6Al-4V 밀링 공정에서 4날 코팅 카바이드 엔드밀의 절삭날별
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m src.main --data qit --scenario S15   # 실제 QIT-CEMC 68 Cycle 재생 데모
+.venv/bin/python -m src.web                               # 시연 웹 화면 → http://localhost:8000
+.venv/bin/python -m src.main --preset finishing           # 터미널 데모 (finishing/roughing/no_stock/due_tight/no_inspection)
 .venv/bin/python -m src.main --data synthetic             # 합성 센서 데이터 데모
 .venv/bin/python -m src.models.train_wear_model           # 마모 모델 평가 → docs/track_b_results.md
 .venv/bin/python -m scripts.evaluate_policies             # 판단 방식 비교 → docs/step3_results.md
@@ -73,19 +74,25 @@ python3 -m venv .venv
   두 CSV의 행 순환 주기(6행과 8행)가 달라서 생긴 것으로 보여요. 코드에서는 이 열을 쓰지 않고 `부품가치 × Remaining_Parts`로 직접 계산해요.
 - **경제성 시트의 행 값은 6행 주기로 반복돼요** (S01=S07=S13=S19). 시나리오는 24개지만 비용 조건의 조합은 6가지예요.
 
+## 시연 웹 화면 (`src/web/`)
+
+실제 QIT-CEMC 68 Cycle을 한 Cycle씩 재생하며 Agent 4개의 판단을 보여준다.
+상황 프리셋 5개(정삭, 황삭, 여분 공구 없음, 납기 임박, 검사 장비 없는 라인)와 조건 직접 조정을 지원하고,
+검사가 필요하면 실제 측정값이 채워진 입력 창이 뜬다 (발표자가 값을 바꿔 다른 상황을 시연할 수 있음).
+교체로 끝나면 같은 기록에서 다른 판단 방식과 손실 시간을 비교한다. 외부 라이브러리 없이 동작해 인터넷이 없어도 된다.
+
 ## 주요 결과
 
 | 문서 | 내용 |
 |---|---|
 | [docs/qit_cemc_data_report.md](docs/qit_cemc_data_report.md) | 데이터 확인: Ti6Al4V·4날 확인, 손상 파일, 편마모 근거 |
 | [docs/track_b_results.md](docs/track_b_results.md) | 마모 모델: 센서로는 공구 단위 최대 마모만 예측 가능, 날 구분은 검사로 |
-| [docs/step3_results.md](docs/step3_results.md) | 판단 방식 비교: 평균 기준 대비 비용 약 1/4, 한계 초과 가공 0 |
+| [docs/step3_results.md](docs/step3_results.md) | 판단 방식 비교 (윙 리브당 손실 시간), 시연 프리셋 5개, 불량 확률 민감도 |
 
 - 실제 라벨 기준 최대 날이 0.3 mm에 처음 닿는 Cycle은 31, 4날 평균 기준으로는 53 (22 Cycle 차이)
 - 센서(Cycle 단위 특징)로는 어느 날이 닳았는지 구분할 수 없어, **센서로 위험 감지 → 4날 검사로 날별 확인 → 재판단** 구조를 사용
 
 ## 다음 단계
 
-1. 시연 앱 (Streamlit): 날별 마모 그래프, Agent 판단 근거, 검사 결과 입력
-2. 발표 자료: 결과 문서 3개의 숫자와 한계를 정리
-3. (선택) Master Agent 판단 근거를 LLM으로 현장 작업자용 설명으로 변환
+1. 발표 자료: 결과 문서 3개의 숫자와 한계를 정리
+2. (선택) Master Agent 판단 근거를 LLM으로 현장 작업자용 설명으로 변환
