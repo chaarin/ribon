@@ -6,8 +6,12 @@ wear:
   uneven_index_threshold: 0.3    # 편마모 지수 (max-min)/mean 이 이 값 이상이면 편마모 (가정값)
   uneven_min_vb_mm: 0.05         # 평균 VB가 이 값 미만이면 편마모를 판단하지 않음 (초기 마모 구간의 노이즈 방지, 가정값)
   inspect_uncertainty_mm: 0.02   # 가장 많이 닳은 날의 예측 불확실성이 이 값 이상이면 검사 후보 (가정값)
-  reinspect_delta_mm: 0.05       # 실측한 날은 그 뒤 예측 VB가 이만큼 늘어야 다시 검사 (가정값)
-  remeasure_uncertainty_mm: 0.08 # 4날 평균 불확실성이 이 값 이상이면 센서 재측정 (가정값)
+  inspect_trigger_vb_mm: 0.2     # 센서 예측 최대 VB + 불확실성이 이 값 이상이면 4날 검사 (품질 주의 구간 경계)
+  reinspect_delta_mm: 0.03       # 실측한 날은 그 뒤 예측 VB가 이만큼 늘어야 다시 검사.
+                                 # QIT-CEMC 재생 평가에서 0.05 → 0.03으로 줄이니 검사 횟수는 같고 교체가 3 Cycle 빨라졌다 (docs/step3_results.md)
+  bias_decay_per_cycle: 0.8       # 검사로 구한 예측 보정값이 Cycle마다 남는 비율. 예측 오차가 일정한 치우침이 아니라
+                                 # 노이즈에 가까워서, 한 번의 보정을 계속 적용하면 오히려 틀어진다 (가정값)
+  remeasure_uncertainty_mm: 0.15 # 4날 평균 불확실성이 이 값 이상이면 센서 재측정. 학습 모델의 평소 불확실성(약 0.08 mm)보다 충분히 커야 함
   min_signal_quality: 0.8        # 가장 나쁜 채널의 유효 샘플 비율이 이 값 미만이면 센서 재측정 (가정값)
 
 quality:
@@ -28,6 +32,7 @@ economics:
     high: 60                     # 이 값 미만이면 HIGH
     medium: 240                  # 이 값 미만이면 MEDIUM
   # Production_Priority가 High면 생산 압박을 한 단계 올린다
+  inspection_time_min: 5         # 공구 4날 현미경 검사에 걸리는 설비 정지 시간 (가정값, 평가의 검사 비용에 사용)
   after_job_downtime_ratio: 0.5  # 공정 후 교체는 작업 전환(셋업)과 겹쳐 정지 비용이 이 비율로 줄어듦 (가정값)
   downtime_multiplier:           # 생산 압박이 클수록 공정 중 정지 비용이 커짐 (가정값)
     LOW: 1.0

@@ -4,11 +4,13 @@ from typing import Protocol
 
 import numpy as np
 
-from src.config.settings import N_EDGES
+from src.config.settings import N_EDGES, SENSOR_CHANNELS
 from src.schemas import SensorWindow
 
 
 class WearModel(Protocol):
+    required_channels: tuple[str, ...]  # 예측에 필요한 센서 채널 (신호 품질은 이 채널만 본다)
+
     def predict(self, features: dict[str, float], window: SensorWindow) -> tuple[np.ndarray, np.ndarray]:
         """Edge 1~4의 (VBmax 예측값, 불확실성)을 mm 단위로 반환한다. 각각 shape (N_EDGES,)."""
         ...
@@ -20,6 +22,8 @@ class DummyWearModel:
     라벨이 있으면 라벨에 일정한 과소추정 오차와 노이즈를 섞어 예측을 흉내 내고,
     없으면 누적 절삭 시간으로 평균 마모를 추정한다. 성능 평가에 사용하지 않는다.
     """
+
+    required_channels = SENSOR_CHANNELS
 
     def __init__(
         self,

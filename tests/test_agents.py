@@ -56,7 +56,7 @@ def test_no_inspection_when_unavailable():
 
 def test_measured_edge_is_not_reinspected_until_wear_grows():
     state = ToolState("T01")
-    state.edges[2].last_measured_vb_mm = 0.12
+    state.edges[2].last_measured_vb_mm = 0.14
     assert decide(make_wear([0.10, 0.10, 0.16, 0.10]), state=state).action == Action.CONTINUE
     assert decide(make_wear([0.10, 0.10, 0.18, 0.10]), state=state).action == Action.INSPECT_EDGE
 
@@ -94,3 +94,27 @@ def test_production_pressure():
     assert agent.analyze(quality, scenario(due_slack_min=720, production_priority="Low")).production_pressure == RiskLevel.LOW
     assert agent.analyze(quality, scenario(due_slack_min=120, production_priority="Low")).production_pressure == RiskLevel.MEDIUM
     assert agent.analyze(quality, scenario(due_slack_min=120, production_priority="High")).production_pressure == RiskLevel.HIGH
+
+
+def test_tool_level_prediction_triggers_all_edge_inspection():
+    # 센서 모델은 4날 모두 같은 값(최대 마모 예측)을 준다 → 편마모는 모르지만 주의 구간이면 4날 검사
+    decision = decide(make_wear([0.18] * 4, uncertainty=0.04))
+    assert decision.action == Action.INSPECT_EDGE
+    assert decision.target_edge is None
+
+
+def test_tool_inspection_not_repeated_until_wear_grows():
+    state = ToolState("T01")
+    for e in state.edges:
+        e.last_measured_vb_mm = 0.15
+    state.edges[3].last_measured_vb_mm = 0.19
+    assert decide(make_wear([0.20] * 4, uncertainty=0.04), state=state).action != Action.INSPECT_EDGE
+    assert decide(make_wear([0.23] * 4, uncertainty=0.04), state=state).action == Action.INSPECT_EDGE
+
+
+def test_confident_prediction_needs_no_tool_inspection():
+    assert decide(make_wear([0.22] * 4, uncertainty=0.005)).action != Action.INSPECT_EDGE
+
+
+def test_no_tool_inspection_below_caution_zone():
+    assert decide(make_wear([0.12] * 4, uncertainty=0.04)).action == Action.CONTINUE

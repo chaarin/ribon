@@ -33,10 +33,10 @@ def preprocess(window: SensorWindow) -> dict[str, np.ndarray]:
     return cleaned
 
 
-def channel_quality(window: SensorWindow) -> dict[str, float]:
-    """기대 채널별 유효 샘플 비율 (채널이 없으면 0)."""
+def channel_quality(window: SensorWindow, channels: tuple[str, ...] = SENSOR_CHANNELS) -> dict[str, float]:
+    """채널별 유효 샘플 비율 (채널이 없으면 0)."""
     scores = {}
-    for name in SENSOR_CHANNELS:
+    for name in channels:
         signal = window.signals.get(name)
         if signal is None or len(signal) == 0:
             scores[name] = 0.0

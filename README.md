@@ -9,7 +9,10 @@ Ti-6Al-4V 밀링 공정에서 4날 코팅 카바이드 엔드밀의 절삭날별
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m src.main --scenario S15   # 합성 센서 데이터 + 시나리오 데모
+.venv/bin/python -m src.main --data qit --scenario S15   # 실제 QIT-CEMC 68 Cycle 재생 데모
+.venv/bin/python -m src.main --data synthetic             # 합성 센서 데이터 데모
+.venv/bin/python -m src.models.train_wear_model           # 마모 모델 평가 → docs/track_b_results.md
+.venv/bin/python -m scripts.evaluate_policies             # 판단 방식 비교 → docs/step3_results.md
 .venv/bin/pytest               # 테스트
 ```
 
@@ -35,10 +38,11 @@ python3 -m venv .venv
 |---|---|---|---|
 | `src/schemas/` | Agent 간 데이터 형식 | 공통 (수정 시 팀 합의) | 완료 |
 | `src/config/thresholds.yaml` | 모든 판단 기준값 | 공통 | 초기 가정값 |
-| `src/data/loader.py` | QIT-CEMC 로더 | A | TODO |
-| `src/data/preprocess.py`, `features.py` | 전처리, 특징 추출 | A | 기본 구현 |
-| `src/models/wear_model.py`, `train_wear_model.py` | 날별 VBmax 예측 모델 | B | 더미 모델 |
-| `src/agents/wear_agent.py` | Wear Agent | B | 구현 |
+| `src/data/loader.py`, `scripts/extract_features.py` | QIT-CEMC 로더, 특징 추출 (서버) | A | 완료 |
+| `src/data/preprocess.py`, `features.py` | 전처리(드리프트 제거), 특징 | A | 완료 |
+| `src/models/tool_wear_model.py`, `train_wear_model.py` | 공구 단위 최대 VBmax 예측 (Ridge, 힘/토크) | B | 완료 |
+| `src/agents/wear_agent.py` | Wear Agent | B | 완료 |
+| `src/evaluation/`, `scripts/evaluate_policies.py` | 실제 데이터 재생, 판단 방식 비교 | Step 3 | 완료 |
 | `src/models/quality_reference.py` | 논문 VB–Ra 참조 데이터 로딩 | C | 구현 (참고 근거용) |
 | `src/agents/quality_agent.py` | Quality Agent | C | 구현 |
 | `src/simulation/production_sim.py` | 시나리오 S01~S24 로딩 | D | 구현 |
@@ -69,12 +73,19 @@ python3 -m venv .venv
   두 CSV의 행 순환 주기(6행과 8행)가 달라서 생긴 것으로 보여요. 코드에서는 이 열을 쓰지 않고 `부품가치 × Remaining_Parts`로 직접 계산해요.
 - **경제성 시트의 행 값은 6행 주기로 반복돼요** (S01=S07=S13=S19). 시나리오는 24개지만 비용 조건의 조합은 6가지예요.
 
+## 주요 결과
+
+| 문서 | 내용 |
+|---|---|
+| [docs/qit_cemc_data_report.md](docs/qit_cemc_data_report.md) | 데이터 확인: Ti6Al4V·4날 확인, 손상 파일, 편마모 근거 |
+| [docs/track_b_results.md](docs/track_b_results.md) | 마모 모델: 센서로는 공구 단위 최대 마모만 예측 가능, 날 구분은 검사로 |
+| [docs/step3_results.md](docs/step3_results.md) | 판단 방식 비교: 평균 기준 대비 비용 약 1/4, 한계 초과 가공 0 |
+
+- 실제 라벨 기준 최대 날이 0.3 mm에 처음 닿는 Cycle은 31, 4날 평균 기준으로는 53 (22 Cycle 차이)
+- 센서(Cycle 단위 특징)로는 어느 날이 닳았는지 구분할 수 없어, **센서로 위험 감지 → 4날 검사로 날별 확인 → 재판단** 구조를 사용
+
 ## 다음 단계
 
-1. **Track A (학교 서버):** [작업 지시서](docs/track_a_server_guide.md) 참고. 폴더 구조 조사 → `loader.py` 구현 → Cycle별 특징 추출.
-   결과물 `data/features/qit_cemc_features.csv`(68행 × 특징 + Edge 1~4 VBmax)는 수백 KB 수준이라 git에 올릴 수 있어요.
-   그러면 40GB 원본 없이 어느 컴퓨터에서든 모델을 학습할 수 있어요.
-2. **Track B:** 라벨이 68개뿐이라 딥러닝보다 특징 기반의 가벼운 모델(Ridge, 랜덤포레스트, LightGBM)이 적합해요.
-   공구가 여러 개면 공구 단위로, 한 개면 앞쪽 Cycle로 학습하고 뒤쪽 Cycle로 평가해야 해요 (무작위 분할 금지).
-   평가할 때는 같은 데이터로 평균 마모 기준 판단과 날별 판단을 비교해서 차별점의 근거로 삼아요.
-3. **Streamlit 앱:** 공구가격, 부품가치, 재고, 남은 수량을 사용자가 입력하게 하고, 시나리오 S01~S24는 기본값으로 사용해요.
+1. 시연 앱 (Streamlit): 날별 마모 그래프, Agent 판단 근거, 검사 결과 입력
+2. 발표 자료: 결과 문서 3개의 숫자와 한계를 정리
+3. (선택) Master Agent 판단 근거를 LLM으로 현장 작업자용 설명으로 변환

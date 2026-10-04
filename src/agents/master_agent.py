@@ -5,6 +5,9 @@
 2. VBmax가 교체 한계값 이상 → 즉시 교체
 3. 편마모이고 최대 마모 날의 예측이 불확실하며 현장 검사가 가능하면 → 해당 날 검사
    (이미 실측한 날은 그 뒤 예측 VB가 reinspect_delta_mm 이상 늘었을 때만)
+3b. 센서 예측(+불확실성)이 표면 품질 주의 구간에 들어왔고, 예측이 불확실하며, 날별 실측이 없으면 → 4개 날 모두 검사
+   (센서 특징으로는 어느 날이 닳았는지 구분할 수 없으므로 검사로 날별 상태를 확인한다.
+    마지막 검사 이후 최대 VB가 reinspect_delta_mm 이상 늘었을 때만 다시 검사)
 4. 품질 위험 HIGH → 즉시 교체
 5. 품질 위험 MEDIUM → 즉시 교체 / 공정 후 교체 중 기대 비용이 작은 쪽 (재고가 없으면 공정 후 교체)
 6. 그 외 → 계속 가공
@@ -75,6 +78,22 @@ class MasterAgent(BaseAgent):
                 )
             caveat += " (편마모 의심이나 현장 검사 불가 → 예측값 기준 판단)"
 
+        inspect_from_vb = wear_th["inspect_trigger_vb_mm"]
+        if (
+            can_recheck
+            and economics.inspection_available
+            and not any(e.measured for e in wear.edges)
+            and worst.uncertainty_mm >= wear_th["inspect_uncertainty_mm"]
+            and wear.vb_max + worst.uncertainty_mm >= inspect_from_vb
+            and self._needs_tool_inspection(wear.vb_max, state)
+        ):
+            return decide(
+                Action.INSPECT_EDGE,
+                f"센서 예측 최대 VBmax {wear.vb_max:.3f}±{worst.uncertainty_mm:.3f} mm로 주의 구간({inspect_from_vb} mm) 진입 "
+                "→ 4개 날 실측으로 날별 상태 확인",
+                target_edge=None,
+            )
+
         if quality.risk_level == RiskLevel.HIGH:
             return decide(Action.REPLACE_NOW, "품질 위험 HIGH" + self._stock_warning(economics) + caveat)
 
@@ -93,6 +112,10 @@ class MasterAgent(BaseAgent):
     def _needs_inspection(self, edge_id: int, vb_mm: float, state: ToolState) -> bool:
         last = state.edges[edge_id - 1].last_measured_vb_mm
         return last is None or vb_mm - last >= self.thresholds["wear"]["reinspect_delta_mm"]
+
+    def _needs_tool_inspection(self, vb_max_mm: float, state: ToolState) -> bool:
+        measured = [e.last_measured_vb_mm for e in state.edges if e.last_measured_vb_mm is not None]
+        return not measured or vb_max_mm - max(measured) >= self.thresholds["wear"]["reinspect_delta_mm"]
 
     def _confidence(self, wear: WearReport) -> float:
         limit = self.thresholds["wear"]["remeasure_uncertainty_mm"]

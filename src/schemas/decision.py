@@ -16,6 +16,6 @@ class Decision:
     tool_id: str
     cycle: int
     action: Action
-    target_edge: int | None = None  # INSPECT_EDGE일 때 검사할 날
+    target_edge: int | None = None  # INSPECT_EDGE일 때 검사할 날 (None이면 4개 날 모두 검사)
     reasons: list[str] = field(default_factory=list)
     confidence: float = 1.0

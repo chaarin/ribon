@@ -23,3 +23,4 @@ class SensorWindow:
     cumulative_cut_time_min: float  # 이 Cycle 종료 시점까지의 누적 절삭 시간
     condition: CuttingCondition | None = None
     vb_label_mm: list[float] | None = None  # 데이터셋의 Edge 1~4 VBmax 라벨 (학습·평가용)
+    features: dict[str, float] | None = None  # 미리 추출한 특징 (있으면 signals 대신 사용, 실제 데이터 재생용)

@@ -45,15 +45,18 @@ class MaintenancePipeline:
         self.history.append("wear", wear)
         return self._decide(wear, ctx)
 
-    def apply_feedback(self, inspection: InspectionResult) -> Decision:
-        """검사 결과를 반영해 같은 Cycle을 재판단한다."""
-        if inspection.tool_id not in self._last:
-            raise ValueError(f"{inspection.tool_id}: 판단 이력이 없어 Feedback을 반영할 수 없습니다")
-        state = self.state_store.get(inspection.tool_id)
-        wear, ctx = self._last[inspection.tool_id]
-        wear = apply_inspection(inspection, wear, state)
+    def apply_feedback(self, inspections: InspectionResult | list[InspectionResult]) -> Decision:
+        """검사 결과(한 날 또는 여러 날)를 반영해 같은 Cycle을 재판단한다."""
+        inspections = inspections if isinstance(inspections, list) else [inspections]
+        tool_id = inspections[0].tool_id
+        if tool_id not in self._last:
+            raise ValueError(f"{tool_id}: 판단 이력이 없어 Feedback을 반영할 수 없습니다")
+        state = self.state_store.get(tool_id)
+        wear, ctx = self._last[tool_id]
+        for inspection in inspections:
+            wear = apply_inspection(inspection, wear, state)
+            self.history.append("feedback", inspection)
         state.rechecks_this_cycle += 1
-        self.history.append("feedback", inspection)
         return self._decide(wear, ctx)
 
     def confirm_replacement(self, tool_id: str) -> None:
