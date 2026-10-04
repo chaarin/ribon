@@ -71,7 +71,7 @@ python3 -m venv .venv
 
 ## 다음 단계
 
-1. **Track A (학교 서버):** QIT-CEMC 폴더 구조와 채널·라벨 열 이름 확인 → `loader.py` 구현 → Cycle별 특징 추출.
+1. **Track A (학교 서버):** [작업 지시서](docs/track_a_server_guide.md) 참고. 폴더 구조 조사 → `loader.py` 구현 → Cycle별 특징 추출.
    결과물 `data/features/qit_cemc_features.csv`(68행 × 특징 + Edge 1~4 VBmax)는 수백 KB 수준이라 git에 올릴 수 있어요.
    그러면 40GB 원본 없이 어느 컴퓨터에서든 모델을 학습할 수 있어요.
 2. **Track B:** 라벨이 68개뿐이라 딥러닝보다 특징 기반의 가벼운 모델(Ridge, 랜덤포레스트, LightGBM)이 적합해요.
