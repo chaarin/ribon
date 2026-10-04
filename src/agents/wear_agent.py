@@ -40,7 +40,8 @@ class WearAgent(BaseAgent):
                     edge_id=i + 1,
                     vb_max_mm=vb,
                     uncertainty_mm=float(uncertainty[i]) * (1 - weight) + MEASURED_UNCERTAINTY_MM * weight,
-                    increment_mm=vb - edge_state.vb_mm if is_new_cycle else 0.0,
+                    # 증가량은 모델 예측끼리 비교한다. 보정값이 줄어드는 것은 마모 증가가 아니다
+                    increment_mm=float(raw_vb[i]) - edge_state.raw_pred_mm if is_new_cycle and state.cut_time_min > 0 else 0.0,
                     raw_vb_mm=float(raw_vb[i]),
                 )
             )

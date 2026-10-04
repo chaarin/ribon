@@ -14,6 +14,7 @@ from src.models.tool_wear_model import LABEL_COLUMNS, PrecomputedWearModel, bloc
 from src.agents.wear_agent import WearAgent
 from src.orchestrator.pipeline import MaintenancePipeline
 from src.schemas import Action, Decision, InspectionResult, ProductionContext, SensorWindow
+from src.simulation.production_sim import advance_cycle, start_context
 
 TOOL_ID = "QIT-CEMC"
 
@@ -64,8 +65,10 @@ def run_system(
     pipeline = MaintenancePipeline(wear_agent=WearAgent(model=model), history=HistoryStore())
     result = ReplayResult(replace_cycle=None)
     emit = on_event or (lambda kind, payload: None)
+    ctx = start_context(ctx)
 
     for window in qit_windows(df):
+        ctx = advance_cycle(ctx)  # 이 Cycle을 가공한 뒤의 윙 리브 진행 상황으로 판단한다
         decision = pipeline.run_cycle(window, ctx)
         emit("decision", decision)
         while decision.action in (Action.INSPECT_EDGE, Action.REMEASURE):

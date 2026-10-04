@@ -1,43 +1,53 @@
 # 의사결정에 쓰이는 모든 기준값.
-# 출처가 있는 값은 출처를 적고, 나머지는 가정값으로 표시한다. 근거가 확보되면 갱신한다.
+# 출처가 있는 값은 출처를 적고, 나머지는 MVP 가정값으로 표시한다. 근거가 확보되면 갱신한다.
 
 wear:
-  vb_limit_mm: 0.3               # 교체 한계 VBmax. ISO 8688-2의 일반적 공구수명 기준(VB 0.3 mm)
+  vb_limit_mm: 0.3               # 교체 한계 VBmax. ISO 8688-2의 일반적 공구수명 기준(VB 0.3 mm). 공구 용도와 무관하게 항상 적용
   uneven_index_threshold: 0.3    # 편마모 지수 (max-min)/mean 이 이 값 이상이면 편마모 (가정값)
   uneven_min_vb_mm: 0.05         # 평균 VB가 이 값 미만이면 편마모를 판단하지 않음 (초기 마모 구간의 노이즈 방지, 가정값)
-  inspect_uncertainty_mm: 0.02   # 가장 많이 닳은 날의 예측 불확실성이 이 값 이상이면 검사 후보 (가정값)
-  inspect_trigger_vb_mm: 0.2     # 센서 예측 최대 VB + 불확실성이 이 값 이상이면 4날 검사 (품질 주의 구간 경계)
-  reinspect_delta_mm: 0.03       # 실측한 날은 그 뒤 예측 VB가 이만큼 늘어야 다시 검사.
-                                 # QIT-CEMC 재생 평가에서 0.05 → 0.03으로 줄이니 검사 횟수는 같고 교체가 3 Cycle 빨라졌다 (docs/step3_results.md)
-  bias_decay_per_cycle: 0.8       # 검사로 구한 예측 보정값이 Cycle마다 남는 비율. 예측 오차가 일정한 치우침이 아니라
+  inspect_uncertainty_mm: 0.02   # 예측 불확실성이 이 값 이상일 때만 검사 (이미 확실하면 검사하지 않음, 가정값)
+  reinspect_delta_mm: 0.03       # 실측한 뒤 예측 VB가 이만큼 늘어야 다시 검사.
+                                 # QIT-CEMC 재생 평가에서 0.05 → 0.03으로 줄이니 검사 횟수는 같고 교체가 3 Cycle 빨라졌다
+  bias_decay_per_cycle: 0.8      # 검사로 구한 예측 보정값이 Cycle마다 남는 비율. 예측 오차가 일정한 치우침이 아니라
                                  # 노이즈에 가까워서, 한 번의 보정을 계속 적용하면 오히려 틀어진다 (가정값)
   remeasure_uncertainty_mm: 0.15 # 4날 평균 불확실성이 이 값 이상이면 센서 재측정. 학습 모델의 평소 불확실성(약 0.08 mm)보다 충분히 커야 함
-  min_signal_quality: 0.8        # 가장 나쁜 채널의 유효 샘플 비율이 이 값 미만이면 센서 재측정 (가정값)
+  min_signal_quality: 0.8        # 모델에 필요한 채널 중 가장 나쁜 채널의 유효 샘플 비율이 이 값 미만이면 재측정 (가정값)
 
 quality:
-  # 품질 위험은 VB→Ra 추정이 아니라 마모 상태로 판단한다.
-  # 참조 데이터(Nguyen et al. 2024, L27)에서 VB와 Ra의 상관이 거의 없어(r≈0.06) Ra 추정 곡선을 쓸 근거가 없기 때문.
-  vb_medium_mm: 0.2              # Li et al. (2018): Ti-6Al-4V 고속가공에서 VB < 0.2 mm일 때 과도한 표면 결함을 피함 (해당 실험의 관찰값)
-  vb_high_mm: 0.3                # ISO 8688-2 공구수명 기준
-  rapid_increment_mm: 0.02       # 직전 Cycle 대비 VB 증가량이 이 값 이상이면 급속 마모 (MEDIUM 이상에서 위험 한 단계 상향, 가정값)
-  reference_vb_window_mm: 0.03   # 참조 데이터에서 현재 VB ± 이 범위의 실험을 찾아 Ra 범위를 근거로 제시
+  rapid_increment_mm: 0.02       # 실측끼리 비교한 Cycle당 VB 증가량이 이 값 이상이면 급속 마모 (MEDIUM 이상에서 위험 한 단계 상향, 가정값)
+  reference_vb_window_mm: 0.03   # 참조 논문 데이터에서 현재 VB ± 이 범위의 실험을 찾아 Ra 범위를 근거로 제시
 
-economics:
-  # 위험 등급별 부품 1개당 불량 확률 (가정값). 비용은 새 공구(LOW) 대비 '추가' 불량 확률로 계산한다.
-  defect_probability:
-    LOW: 0.01
-    MEDIUM: 0.05
-    HIGH: 0.30
+# 공구 용도별 품질 기준과 불량 시 손실 (MVP 가정).
+# 현장에서는 보통 정삭용·황삭용 공구를 따로 쓴다. 마모 진행은 같고 '어디까지 써도 되는가'가 다르다.
+tool_purpose:
+  finishing:                     # 정삭: 표면이 곧 제품 품질
+    label: 정삭
+    vb_medium_mm: 0.2            # Li et al. (2018): Ti-6Al-4V 고속가공에서 VB < 0.2 mm일 때 과도한 표면 결함을 피함
+    vb_high_mm: 0.3              # ISO 8688-2 공구수명 기준
+    defect_loss: rib             # 불량이 나면 윙 리브 전체를 다시 가공 (가공 시간 전체 손실)
+  roughing:                      # 황삭: 이후 정삭 공정에서 표면을 다시 깎음
+    label: 황삭
+    vb_medium_mm: 0.25           # 0.3 mm 수명 기준에 가까워지는 구간 (가정값)
+    vb_high_mm: 0.3              # ISO 8688-2 공구수명 기준
+    defect_loss: cycle           # 불량이 나도 해당 Cycle만 재가공 (가정값)
+
+production:
+  cycles_per_rib: 10             # 윙 리브 1개 가공 = 10 Cycle (MVP 가정)
+  cycle_time_min: 8.5            # Cycle당 절삭 시간. QIT-CEMC 실측 중앙값 8.51분
+  inspection_time_min: 5         # 공구 4날 현미경 검사에 걸리는 설비 정지 시간 (MVP 가정)
+  after_rib_change_ratio: 0.5    # 윙 리브를 끝내고 교체하면 작업 전환(셋업)과 겹쳐 정지 시간이 이 비율로 줄어듦 (MVP 가정)
   pressure_slack_min:            # 납기 여유 시간(분) 기준 생산 압박
     high: 60                     # 이 값 미만이면 HIGH
     medium: 240                  # 이 값 미만이면 MEDIUM
   # Production_Priority가 High면 생산 압박을 한 단계 올린다
-  inspection_time_min: 5         # 공구 4날 현미경 검사에 걸리는 설비 정지 시간 (가정값, 평가의 검사 비용에 사용)
-  after_job_downtime_ratio: 0.5  # 공정 후 교체는 작업 전환(셋업)과 겹쳐 정지 비용이 이 비율로 줄어듦 (가정값)
-  downtime_multiplier:           # 생산 압박이 클수록 공정 중 정지 비용이 커짐 (가정값)
-    LOW: 1.0
-    MEDIUM: 1.5
-    HIGH: 2.0
+
+economics:
+  # 위험 등급별 Cycle당 불량 확률 (MVP 가정). 판단에는 새 공구(LOW) 대비 '추가' 확률을 쓴다.
+  # 결과가 이 값에 얼마나 민감한지는 docs/step3_results.md의 민감도 분석 참고
+  defect_probability:
+    LOW: 0.01
+    MEDIUM: 0.05
+    HIGH: 0.30
 
 decision:
   max_rechecks_per_cycle: 2      # 한 Cycle에서 재측정·검사 후 재판단을 반복할 수 있는 최대 횟수

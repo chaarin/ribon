@@ -25,8 +25,18 @@ def test_uneven_or_rapid_wear_escalates_only_from_medium():
     # LOW 구간의 편마모는 등급을 올리지 않는다 (검사는 Master가 판단)
     assert agent.analyze(make_wear([0.10, 0.10, 0.16, 0.10])).risk_level == RiskLevel.LOW
     assert agent.analyze(make_wear([0.15, 0.15, 0.25, 0.15])).risk_level == RiskLevel.HIGH
-    rapid = make_wear([0.25] * 4, increments=[0.0, 0.0, 0.03, 0.0])
-    assert agent.analyze(rapid).risk_level == RiskLevel.HIGH
+    # 급속 마모는 실측끼리 비교한 증가량으로만 본다 (센서 예측끼리의 차이는 노이즈)
+    rapid_measured = make_wear([0.25] * 4, increments=[0.0, 0.0, 0.03, 0.0], measured=True)
+    assert agent.analyze(rapid_measured).risk_level == RiskLevel.HIGH
+    rapid_predicted = make_wear([0.25] * 4, increments=[0.0, 0.0, 0.03, 0.0])
+    assert agent.analyze(rapid_predicted).risk_level == RiskLevel.MEDIUM
+
+
+def test_roughing_tool_tolerates_more_wear():
+    agent = QualityAgent()
+    wear = make_wear([0.22] * 4)
+    assert agent.analyze(wear, "finishing").risk_level == RiskLevel.MEDIUM
+    assert agent.analyze(wear, "roughing").risk_level == RiskLevel.LOW
 
 
 def test_quality_cites_reference_data():
@@ -70,22 +80,36 @@ def test_bad_signal_requests_remeasure_until_limit():
     assert exhausted.confidence < 0.5
 
 
-def test_medium_risk_cost_tradeoff():
-    wear = make_wear([0.22] * 4, uncertainty=0.005)
-    # 고가 부품이 많이 남으면 즉시 교체
-    assert decide(wear).action == Action.REPLACE_NOW
-    # 재고가 없으면 공정 후 교체
-    assert decide(wear, ctx=scenario(tool_stock=0)).action == Action.REPLACE_AFTER_JOB
-    # 저가 부품 1개만 남고 납기가 급하면 공정 후 교체가 더 저렴
-    cheap = scenario("S01", part_value=50_000, tool_stock=1, due_slack_min=30, production_priority="High")
-    assert decide(wear, ctx=cheap).action == Action.REPLACE_AFTER_JOB
+def test_medium_risk_decisions_depend_on_rib_position_stock_and_due():
+    wear = make_wear([0.22] * 4, uncertainty=0.005, measured=True)  # 실측으로 확인된 MEDIUM (정삭)
+    early_in_rib = scenario(process_progress_pct=20)  # 남은 8 Cycle: 위험 27분 > 교체 15분
+    assert decide(wear, ctx=early_in_rib).action == Action.REPLACE_NOW
+    assert decide(wear, ctx=scenario(process_progress_pct=20, tool_stock=0)).action == Action.REPLACE_AFTER_JOB
+    due_tight = scenario(process_progress_pct=20, due_slack_min=5, production_priority="High")
+    assert decide(wear, ctx=due_tight).action == Action.REPLACE_AFTER_JOB
+    # 윙 리브 끝 무렵: 남은 2 Cycle의 위험(6.8분) < 교체 15분 → 계속 가공
+    assert decide(wear, ctx=scenario(process_progress_pct=80)).action == Action.CONTINUE
+    # 윙 리브를 막 마친 시점: 다음 윙 리브 위험(34분) > 작업 전환 중 교체(7.5분) → 경계에서 교체
+    assert decide(wear, ctx=scenario(process_progress_pct=100)).action == Action.REPLACE_AFTER_JOB
 
 
-def test_low_risk_has_no_extra_cost():
+def test_roughing_keeps_cutting_at_medium_until_limit():
+    ctx = scenario(process_progress_pct=20, tool_purpose="roughing")
+    assert decide(make_wear([0.27] * 4, uncertainty=0.005, measured=True), ctx=ctx).action == Action.CONTINUE
+    assert decide(make_wear([0.30] * 4, uncertainty=0.005, measured=True), ctx=ctx).action == Action.REPLACE_NOW
+
+
+def test_low_risk_has_no_extra_loss():
     quality = QualityAgent().analyze(make_wear([0.05] * 4))
     report = EconomicsAgent().analyze(quality, scenario())
-    assert report.cost_continue == 0
+    assert report.loss_continue_min == 0
     assert report.recommended == Action.CONTINUE
+
+
+def test_inspection_only_when_worth_more_than_its_time():
+    wear = make_wear([0.18] * 4, uncertainty=0.04)
+    assert decide(wear).action == Action.INSPECT_EDGE  # 정삭: 불량 1건 85분 → 검사 가치 큼
+    assert decide(wear, ctx=scenario(tool_purpose="roughing")).action != Action.INSPECT_EDGE  # 황삭: 8.5분 → 검사보다 가공
 
 
 def test_production_pressure():

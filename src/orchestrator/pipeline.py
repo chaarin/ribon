@@ -30,6 +30,12 @@ class MaintenancePipeline:
         self.state_store = state_store or ToolStateStore()
         self.history = history or HistoryStore()
         self._last: dict[str, tuple[WearReport, ProductionContext]] = {}
+        self.last_reports: dict[str, dict] = {}  # 화면 표시용: tool_id → 마지막 판단의 Agent별 보고서
+
+    def update_context(self, tool_id: str, ctx: ProductionContext) -> None:
+        """다음 재판단에 쓸 생산 상황을 바꾼다 (화면에서 조건을 바꿨을 때)."""
+        if tool_id in self._last:
+            self._last[tool_id] = (self._last[tool_id][0], ctx)
 
     def run_cycle(self, window: SensorWindow, ctx: ProductionContext) -> Decision:
         """새 Cycle의 센서 데이터로 판단한다. 같은 Cycle을 다시 넣으면 재측정으로 간주한다."""
@@ -68,8 +74,9 @@ class MaintenancePipeline:
     def _decide(self, wear: WearReport, ctx: ProductionContext) -> Decision:
         state = self.state_store.get(wear.tool_id)
         self._last[wear.tool_id] = (wear, ctx)
-        quality = self.quality_agent.analyze(wear)
-        economics = self.economics_agent.analyze(quality, ctx)
+        quality = self.quality_agent.analyze(wear, ctx.tool_purpose)
+        economics = self.economics_agent.analyze(quality, ctx, wear)
         decision = self.master_agent.analyze(wear, quality, economics, state)
+        self.last_reports[wear.tool_id] = {"wear": wear, "quality": quality, "economics": economics, "decision": decision}
         self.history.append("decision", decision)
         return decision

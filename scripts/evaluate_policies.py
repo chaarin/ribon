@@ -1,4 +1,4 @@
-"""Step 3 평가: 실제 QIT-CEMC 68 Cycle에서 교체 판단 방식 비교.
+"""Step 3 평가: 실제 QIT-CEMC 68 Cycle에서 교체 판단 방식 비교 (손실 = 가공 시간).
 
 실행: python -m scripts.evaluate_policies
 결과: docs/step3_results.md
@@ -7,117 +7,130 @@ import numpy as np
 import pandas as pd
 
 from src.config.settings import ROOT_DIR, load_thresholds
-from src.evaluation.policies import baseline_replace_cycles, evaluate, true_risk_levels
+from src.evaluation.policies import compare_policies
 from src.evaluation.replay import out_of_sample_model, run_system
-from src.models.tool_wear_model import LABEL_COLUMNS, load_features, worst_edge_vb
-from src.simulation.production_sim import load_scenarios
+from src.models.tool_wear_model import load_features
+from src.simulation.production_sim import PRESETS, load_scenarios
 
 REPORT_PATH = ROOT_DIR / "docs" / "step3_results.md"
-SYSTEM = "Multi-Agent 시스템 (센서 + 검사)"
-DETAIL_SCENARIOS = ("S01", "S08", "S10", "S15")
+SCALES = (0.5, 1.0, 2.0)
+
+
+def table(outcomes) -> list[str]:
+    lines = [
+        "| 방식 | 교체 Cycle | 검사 | 한계 초과 가공 | 윙 리브당 손실(분) | 그중 불량 | 윙 리브당 공구 |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for o in outcomes:
+        lines.append(
+            f"| {o.name} | {o.replace_cycle}{'' if o.replaced else ' (교체 안 함)'} | {o.n_inspections} | {o.over_limit_cycles} | "
+            f"{o.loss_min_per_rib:.1f} | {o.defect_loss_min_per_rib:.1f} | {o.tools_per_rib:.2f}개 |"
+        )
+    return lines
 
 
 def main() -> None:
     df = load_features()
-    thresholds = load_thresholds()
+    th = load_thresholds()
+    prod = th["production"]
     model = out_of_sample_model(df)
-    sensor_pred = np.array([model.predictions[c] for c in df["cycle"]])
-    baselines = baseline_replace_cycles(df, sensor_pred)
-
-    rows = []
-    for sid, ctx in load_scenarios().items():
-        result = run_system(df, ctx, model=model)
-        outcomes = [evaluate(SYSTEM, result.replace_cycle, len(result.inspection_cycles), df, ctx, thresholds)]
-        # '매 Cycle 실측 가정' 방식은 교체할 때까지 매 Cycle 검사가 필요하므로 그만큼 검사 비용을 넣는다
-        outcomes += [
-            evaluate(name, k, (k or int(df["cycle"].max())) if "실측" in name else 0, df, ctx, thresholds)
-            for name, k in baselines.items()
-        ]
-        for o in outcomes:
-            rows.append({"scenario": sid, **o.__dict__})
-    res = pd.DataFrame(rows)
-
-    # 시나리오마다 가장 저렴한 방식 대비 비용 비율
-    res["cost_ratio"] = res["cost_per_cycle"] / res.groupby("scenario")["cost_per_cycle"].transform("min")
-    order = [SYSTEM, *baselines]
-    summary = (
-        res.groupby("name")
-        .agg(
-            교체_Cycle=("replace_cycle", "median"),
-            검사_횟수=("n_inspections", "mean"),
-            한계초과_가공_Cycle=("over_limit_cycles", "mean"),
-            최저비용_대비=("cost_ratio", "mean"),
-            최저비용_시나리오_수=("cost_ratio", lambda s: int((s <= 1.0 + 1e-9).sum())),
-        )
-        .reindex(order)
-    )
-
-    levels = true_risk_levels(df, thresholds)
-    cycles = df["cycle"].to_numpy()
-    first = lambda lvl: next((int(c) for c, l in zip(cycles, levels) if l.value == lvl), None)
+    pred = np.array([model.predictions[c] for c in df["cycle"]])
 
     lines = [
         "# Step 3 결과: 실제 데이터로 교체 판단 방식 비교",
         "",
-        "자동 생성: `python -m scripts.evaluate_policies` / 데이터: QIT-CEMC 68 Cycle (공구 1개) + 시나리오 S01~S24 (MVP 합성값)",
+        "자동 생성: `python -m scripts.evaluate_policies` / 데이터: QIT-CEMC 68 Cycle (공구 1개) / 생산 조건: 시연 프리셋 5개, 시나리오 S01~S24 (MVP 합성값)",
         "",
         "## 평가 방법",
         "",
         "- **센서 예측:** 각 Cycle을 그 Cycle 앞뒤 5개를 학습에서 뺀 모델로 예측 (블록 교차검증). 답을 본 예측이 섞이지 않게 함",
         "- **검사:** 시스템이 검사를 지시하면 그 Cycle의 실제 Edge 1~4 VBmax를 현장 실측값으로 넣음",
-        "- **비용:** 공구가 같은 수명을 반복한다고 보고 Cycle당 기대 비용 = (공구값 + 교체 정지 + 검사 정지 + Σ 불량 기대손실) / 교체 Cycle",
-        f"  - 불량 기대손실은 실제 최대 날 VB 기준 위험 등급(0.2 mm 미만 LOW / 0.3 mm 미만 MEDIUM / 그 이상 HIGH)의 불량 확률 × 부품가치, Cycle당 부품 1개 가정",
-        f"  - 실제 라벨 기준 첫 MEDIUM은 Cycle {first('MEDIUM')}, 첫 HIGH(0.3 mm)는 Cycle {first('HIGH')}",
-        "- **비교 기준:** '매 Cycle 실측 가정' 방식은 교체할 때까지 매 Cycle 4날을 검사한다고 보고 검사 비용(검사 1회 = 정지 5분, 가정값)을 넣었다",
+        f"- **손실 = 가공 시간(분):** 윙 리브 1개 = {prod['cycles_per_rib']} Cycle, Cycle당 {prod['cycle_time_min']}분 (QIT-CEMC 실측), "
+        f"검사 1회 {prod['inspection_time_min']}분, 교체 시간은 시나리오 값",
+        "  - 불량 1건 손실: 정삭은 윙 리브 전체 재가공(85분), 황삭은 한 Cycle 재가공(8.5분)",
+        "  - 불량 확률: 실제 최대 날 VB 기준 위험 등급별 LOW 1% / MEDIUM 5% / HIGH 30% (MVP 가정)",
+        "  - 공구가 같은 수명을 반복한다고 보고 윙 리브 1개당 손실과 공구 사용량으로 환산",
+        "- **비교 기준:** '매 Cycle 검사' 방식은 교체할 때까지 매 Cycle 4날을 실측한다 (검사 시간 포함)",
         "",
-        "## 요약 (시나리오 24개 평균)",
-        "",
-        "| 방식 | 교체 Cycle (중앙값) | 검사 횟수 | 한계 초과 상태로 가공한 Cycle | 최저 비용 대비 | 최저 비용인 시나리오 수 |",
-        "|---|---|---|---|---|---|",
     ]
-    for name, r in summary.iterrows():
-        lines.append(
-            f"| {name} | {r['교체_Cycle']:.0f} | {r['검사_횟수']:.1f} | {r['한계초과_가공_Cycle']:.1f} | {r['최저비용_대비']:.2f}배 | {int(r['최저비용_시나리오_수'])} / 24 |"
-        )
 
-    lines += ["", "## 대표 시나리오", ""]
-    scenarios = load_scenarios()
-    for sid in DETAIL_SCENARIOS:
-        ctx = scenarios[sid]
+    # 1. 프리셋별 상세
+    lines += ["## 1. 시연 프리셋별 결과 (불량 확률 기본 가정)", ""]
+    for preset in PRESETS.values():
+        ctx = preset.context()
+        r = run_system(df, ctx, model=model)
+        last = r.decisions[-1]
         lines += [
-            f"### {sid}: 부품가치 {ctx.part_value:,.0f}원, 공구 {ctx.tool_price:,.0f}원, 재고 {ctx.tool_stock}개, "
-            f"검사 {'가능' if ctx.inspection_available else '불가'}, 남은 부품 {ctx.remaining_parts}개",
+            f"### {preset.name}",
             "",
-            "| 방식 | 교체 Cycle | 검사 | 한계 초과 가공 | Cycle당 비용(원) |",
-            "|---|---|---|---|---|",
+            f"{preset.description}",
+            "",
+            f"- 시스템 판단: Cycle {r.replace_cycle} **{last.action.value}**, 검사 Cycle {r.inspection_cycles}",
+            f"- 이유: {last.reasons[0]}",
+            "",
+            *table(compare_policies(df, ctx, r.replace_cycle, len(r.inspection_cycles), pred, th)),
+            "",
         ]
-        for _, r in res[res["scenario"] == sid].iterrows():
-            lines.append(
-                f"| {r['name']} | {r['replace_cycle']}{'' if r['replaced'] else ' (교체 안 함)'} | {r['n_inspections']} | "
-                f"{r['over_limit_cycles']} | {r['cost_per_cycle']:,.0f} |"
-            )
-        lines.append("")
 
+    # 2. 민감도 분석
     lines += [
+        "## 2. 불량 확률 가정에 대한 민감도",
+        "",
+        "불량 확률(LOW 1% / MEDIUM 5% / HIGH 30%)은 근거가 없는 가정이라, 절반·2배로 바꿔 결론이 유지되는지 본다.",
+        "",
+        "| 프리셋 | 불량 확률 | 시스템 | 센서 예측 0.3 (검사 없음) | 최대 날 0.3 (매 Cycle 검사) | 평균 0.3 (매 Cycle 검사) | 이상적 (매 Cycle 검사) |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for pid in ("finishing", "roughing"):
+        ctx = PRESETS[pid].context()
+        r = run_system(df, ctx, model=model)
+        for scale in SCALES:
+            o = {x.name: x.loss_min_per_rib for x in compare_policies(df, ctx, r.replace_cycle, len(r.inspection_cycles), pred, th, scale)}
+            sys_name = next(n for n in o if n.startswith("Multi-Agent"))
+            best = min(o, key=o.get)
+            cells = [o[sys_name], o["센서 예측 VB ≥ 0.3 (검사 없음)"], o["최대 날 VB ≥ 0.3 (매 Cycle 검사)"],
+                     o["평균 VB ≥ 0.3 (매 Cycle 검사)"], o["최대 날 VB ≥ 주의 기준 (매 Cycle 검사, 이상적)"]]
+            names = [sys_name, "센서 예측 VB ≥ 0.3 (검사 없음)", "최대 날 VB ≥ 0.3 (매 Cycle 검사)",
+                     "평균 VB ≥ 0.3 (매 Cycle 검사)", "최대 날 VB ≥ 주의 기준 (매 Cycle 검사, 이상적)"]
+            fmt = [f"**{v:.1f}**" if n == best else f"{v:.1f}" for v, n in zip(cells, names)]
+            lines.append(f"| {PRESETS[pid].name} | ×{scale} | " + " | ".join(fmt) + " |")
+    lines += ["", "(윙 리브 1개당 손실 시간, 분. 굵은 글씨가 가장 작은 값)", ""]
+
+    # 3. 팀 시나리오 24개 (정삭 공구 가정)
+    rows = []
+    for sid, ctx in load_scenarios().items():
+        r = run_system(df, ctx, model=model)
+        for o in compare_policies(df, ctx, r.replace_cycle, len(r.inspection_cycles), pred, th):
+            rows.append({"name": o.name, "replace": o.replace_cycle, "insp": o.n_inspections, "over": o.over_limit_cycles,
+                         "loss": o.loss_min_per_rib, "tools": o.tools_per_rib})
+    res = pd.DataFrame(rows)
+    summary = res.groupby("name", sort=False).agg(replace=("replace", "median"), insp=("insp", "mean"),
+                                                  over=("over", "mean"), loss=("loss", "mean"), tools=("tools", "mean"))
+    lines += [
+        "## 3. 팀 시나리오 S01~S24 평균 (정삭 공구 가정)",
+        "",
+        "| 방식 | 교체 Cycle (중앙값) | 검사 | 한계 초과 가공 | 윙 리브당 손실(분) | 윙 리브당 공구 |",
+        "|---|---|---|---|---|---|",
+        *[f"| {n} | {r['replace']:.0f} | {r['insp']:.1f} | {r['over']:.1f} | {r['loss']:.1f} | {r['tools']:.2f}개 |" for n, r in summary.iterrows()],
+        "",
         "## 해석",
         "",
-        "- **평균 기준은 가장 많이 닳은 날을 놓친다.** 교체가 Cycle 53으로 늦고, 한계(0.3 mm)를 넘은 상태로 10 Cycle을 가공한다.",
-        "- **최대 날 0.3 mm 기준**도 표면 결함이 늘어나는 0.2~0.3 mm 구간을 오래 가공해 불량 기대손실이 크다.",
-        "- **Multi-Agent 시스템**은 센서 예측이 주의 구간에 들어올 때만 4날을 검사(평균 2~3회)해 날별 실제 상태를 확인하고,",
-        "  품질 위험과 부품가치·재고를 함께 보고 교체한다. 한계 초과 가공은 0 Cycle이다.",
-        "- **이상적인 방식(매 Cycle 4날 검사 + 0.2 mm 기준)이 가장 저렴하다.** 검사 1회 비용(정지 5분 가정)이 고가 부품의",
-        "  불량 손실보다 훨씬 작기 때문이다. 시스템은 검사를 평균 2~3회만 하는 대신 교체가 2 Cycle 늦어 비용이 더 든다.",
-        "  실제 최대 날이 처음 0.2 mm를 넘는 Cycle 11은 한 날만 갑자기 튄 값이라 공구 단위 센서 예측으로는 잡기 어렵다.",
-        "- 검사가 오래 걸리거나(공구를 빼서 현미경 측정) 검사 인력이 부족한 현장일수록 시스템 방식이 유리해진다.",
+        "- **평균 기준은 가장 많이 닳은 날을 놓친다.** 교체가 Cycle 53으로 늦고 한계(0.3 mm)를 넘은 상태로 10 Cycle을 가공해, 불량 손실이 가장 크다.",
+        "- **매 Cycle 검사하는 방식들은 검사 시간이 손실의 대부분**이다. 날별 상태를 정확히 알아도 매번 멈추는 비용이 크다.",
+        "- **Multi-Agent 시스템은 필요할 때만(2~3회) 검사**해 날별 상태를 확인하고, 공구 용도·재고·납기에 따라 교체 시점과 방식을 바꾼다.",
+        "  매 Cycle 검사 방식들보다 손실이 작고 한계 초과 가공이 없다.",
+        "- **센서 예측만으로 0.3 mm에서 교체하는 단순한 방식과는 우열이 가정에 따라 바뀐다.** 불량 확률이 기본 가정 이하면 검사 시간과",
+        "  더 이른 교체 비용 때문에 단순 방식의 손실이 작고, 불량 확률이 높을수록(×2) 검사로 위험을 일찍 잡는 시스템이 유리해진다.",
+        "  즉 **검사의 가치는 불량이 비쌀수록 커진다.** 이 판단은 실제 현장의 불량률 데이터가 있어야 확정할 수 있다.",
         "",
         "## 한계",
         "",
         "- 공구 1개의 기록을 반복한다고 가정한 평가다. 다른 공구에서의 일반화는 검증하지 못했다.",
-        "- 비용·불량 확률·검사 시간은 모두 MVP 가정값이다. 비용 수치는 '시뮬레이션 기준'으로만 말할 수 있다.",
-        "- 시스템과 평가가 같은 위험 등급 기준(0.2 / 0.3 mm)을 쓰므로, 고정 기준 방식보다 유리한 면이 있다.",
-        "- 라벨 노이즈 때문에 교체 시점이 한두 Cycle 앞뒤로 달라질 수 있다.",
-        "- 재검사 간격(0.03 mm)은 이 공구 하나의 재생 결과를 보고 골랐다 (0.05 mm일 때 이상적 대비 1.41배 → 0.03 mm일 때 1.19배).",
-        "  같은 데이터로 고르고 평가했으므로 다른 공구에서는 성능이 더 낮을 수 있다.",
+        "- 불량 확률, 검사 시간, 윙 리브당 Cycle 수는 MVP 가정이다. 손실 수치는 '시뮬레이션 기준'으로만 말할 수 있다.",
+        "- Cycle 1의 센서 예측은 학습 범위 밖이라 크게 빗나가(예측 0.17 mm, 실제 0.05 mm) 검사가 한 번 더 일어난다.",
+        "  여러 공구로 학습한 실제 모델이라면 이 검사는 줄어든다.",
+        "- 재검사 간격(0.03 mm)은 이 공구 하나의 재생 결과를 보고 골랐다. 다른 공구에서는 성능이 더 낮을 수 있다.",
+        "- 공구 사용량(윙 리브당 공구 개수)은 손실 시간에 넣지 않고 따로 보여준다. 공구값을 시간으로 바꿀 근거가 없기 때문이다.",
     ]
     REPORT_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))

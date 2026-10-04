@@ -5,12 +5,19 @@
 2. VBmax가 교체 한계값 이상 → 즉시 교체
 3. 편마모이고 최대 마모 날의 예측이 불확실하며 현장 검사가 가능하면 → 해당 날 검사
    (이미 실측한 날은 그 뒤 예측 VB가 reinspect_delta_mm 이상 늘었을 때만)
-3b. 센서 예측(+불확실성)이 표면 품질 주의 구간에 들어왔고, 예측이 불확실하며, 날별 실측이 없으면 → 4개 날 모두 검사
+3b. 검사 정보의 가치(Economics Agent)가 검사 시간보다 크고 날별 실측이 없으면 → 4개 날 모두 검사
    (센서 특징으로는 어느 날이 닳았는지 구분할 수 없으므로 검사로 날별 상태를 확인한다.
     마지막 검사 이후 최대 VB가 reinspect_delta_mm 이상 늘었을 때만 다시 검사)
 4. 품질 위험 HIGH → 즉시 교체
-5. 품질 위험 MEDIUM → 즉시 교체 / 공정 후 교체 중 기대 비용이 작은 쪽 (재고가 없으면 공정 후 교체)
+5. 품질 위험 MEDIUM →
+   이 윙 리브를 끝까지 가공할 때의 추가 불량 위험이 교체 시간보다 크면:
+     여분 공구가 없으면 윙 리브를 마친 뒤 교체 (그동안 공구 확보)
+     지금 교체하면 납기를 넘기고 생산 압박이 HIGH면 윙 리브를 마친 뒤 교체
+     그 외에는 지금 교체
+   윙 리브가 막 끝났고 다음 윙 리브의 위험이 경계 교체 시간보다 크면 → 지금(경계에서) 교체
+   그 외 → 계속 가공 (위험이 교체 시간보다 작음. 0.3 mm 한계 전까지 매 Cycle 다시 평가)
 6. 그 외 → 계속 가공
+(0.3 mm 한계와 품질 위험 HIGH는 재고·납기와 상관없이 항상 즉시 교체)
 
 검사(3)를 품질 위험 HIGH(4)보다 먼저 보는 이유: 편마모로 위험이 올라간 경우
 예측이 틀렸을 수 있으므로, 검사가 가능하면 실측으로 확인한 뒤 교체 여부를 다시 판단한다.
@@ -78,19 +85,18 @@ class MasterAgent(BaseAgent):
                 )
             caveat += " (편마모 의심이나 현장 검사 불가 → 예측값 기준 판단)"
 
-        inspect_from_vb = wear_th["inspect_trigger_vb_mm"]
         if (
             can_recheck
             and economics.inspection_available
             and not any(e.measured for e in wear.edges)
             and worst.uncertainty_mm >= wear_th["inspect_uncertainty_mm"]
-            and wear.vb_max + worst.uncertainty_mm >= inspect_from_vb
+            and economics.inspection_value_min >= economics.inspection_time_min
             and self._needs_tool_inspection(wear.vb_max, state)
         ):
             return decide(
                 Action.INSPECT_EDGE,
-                f"센서 예측 최대 VBmax {wear.vb_max:.3f}±{worst.uncertainty_mm:.3f} mm로 주의 구간({inspect_from_vb} mm) 진입 "
-                "→ 4개 날 실측으로 날별 상태 확인",
+                f"센서 예측 최대 VBmax {wear.vb_max:.3f}±{worst.uncertainty_mm:.3f} mm, 주의 구간({quality.caution_vb_mm} mm) 근접. "
+                f"검사 가치 {economics.inspection_value_min:.1f}분 > 검사 시간 {economics.inspection_time_min:.0f}분 → 4개 날 실측",
                 target_edge=None,
             )
 
@@ -98,11 +104,32 @@ class MasterAgent(BaseAgent):
             return decide(Action.REPLACE_NOW, "품질 위험 HIGH" + self._stock_warning(economics) + caveat)
 
         if quality.risk_level == RiskLevel.MEDIUM:
+            ratio = self.thresholds["production"]["after_rib_change_ratio"]
+            if economics.loss_continue_min < economics.loss_replace_now_min:
+                if economics.cycles_left_in_rib == 0 and economics.next_rib_risk_min > economics.loss_replace_now_min * ratio:
+                    return decide(
+                        Action.REPLACE_AFTER_JOB,
+                        f"품질 위험 MEDIUM, 윙 리브를 마친 시점. 다음 윙 리브의 추가 불량 위험({economics.next_rib_risk_min:.1f}분)이 "
+                        f"작업 전환 중 교체({economics.loss_replace_now_min * ratio:.1f}분)보다 커서 지금 교체" + caveat,
+                    )
+                return decide(
+                    Action.CONTINUE,
+                    f"품질 위험 MEDIUM이지만 남은 {economics.cycles_left_in_rib} Cycle의 추가 불량 위험({economics.loss_continue_min:.1f}분)이 "
+                    f"교체 시간({economics.loss_replace_now_min:.0f}분)보다 작아 계속 가공 (0.3 mm 한계 전까지 매 Cycle 재평가)" + caveat,
+                )
             if not economics.tool_available:
-                return decide(Action.REPLACE_AFTER_JOB, "품질 위험 MEDIUM, 여분 공구가 없어 현재 공정 후 교체" + caveat)
-            if economics.cost_replace_now <= economics.cost_replace_after_job:
-                return decide(Action.REPLACE_NOW, "품질 위험 MEDIUM, 남은 부품의 추가 불량 위험보다 즉시 교체가 저렴" + caveat)
-            return decide(Action.REPLACE_AFTER_JOB, "품질 위험 MEDIUM, 남은 부품이 적어 공정 후 교체가 저렴" + caveat)
+                return decide(Action.REPLACE_AFTER_JOB, "품질 위험 MEDIUM, 여분 공구가 없어 이 윙 리브를 마친 뒤 교체 (그동안 공구 확보)" + caveat)
+            if economics.delay_if_replace_now_min > 0 and economics.production_pressure == RiskLevel.HIGH:
+                return decide(
+                    Action.REPLACE_AFTER_JOB,
+                    f"품질 위험 MEDIUM, 지금 교체하면 납기 {economics.delay_if_replace_now_min:.0f}분 지연 + 생산 압박 HIGH "
+                    "→ 이 윙 리브를 마친 뒤 교체" + caveat,
+                )
+            return decide(
+                Action.REPLACE_NOW,
+                f"품질 위험 MEDIUM, 남은 {economics.cycles_left_in_rib} Cycle의 추가 불량 위험({economics.loss_continue_min:.1f}분)이 "
+                f"교체 시간({economics.loss_replace_now_min:.0f}분)보다 커서 지금 교체" + caveat,
+            )
 
         return decide(Action.CONTINUE, "마모·품질 위험 낮음" + caveat)
 

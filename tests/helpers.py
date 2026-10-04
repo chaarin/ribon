@@ -13,13 +13,14 @@ def make_wear(
     increments: list[float] | None = None,
     signal_quality: float = 1.0,
     cycle: int = 1,
+    measured: bool = False,
 ) -> WearReport:
     increments = increments or [0.0] * len(vb)
     return WearReport(
         tool_id="T01",
         cycle=cycle,
         edges=[
-            EdgeWear(i + 1, v, uncertainty, increment_mm=inc, raw_vb_mm=v)
+            EdgeWear(i + 1, v, uncertainty, increment_mm=inc, raw_vb_mm=v, measured=measured)
             for i, (v, inc) in enumerate(zip(vb, increments))
         ],
         signal_quality=signal_quality,
@@ -32,6 +33,6 @@ def scenario(scenario_id: str = "S15", **overrides):
 
 def decide(wear, ctx=None, state=None):
     ctx = ctx or scenario()
-    quality = QualityAgent().analyze(wear)
-    economics = EconomicsAgent().analyze(quality, ctx)
+    quality = QualityAgent().analyze(wear, ctx.tool_purpose)
+    economics = EconomicsAgent().analyze(quality, ctx, wear)
     return MasterAgent().analyze(wear, quality, economics, state or ToolState("T01"))

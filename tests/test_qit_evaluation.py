@@ -64,22 +64,38 @@ def test_replay_without_inspection_never_inspects(df, model):
 def test_baselines_match_label_facts(df, model):
     preds = np.array([model.predictions[c] for c in df["cycle"]])
     base = baseline_replace_cycles(df, preds)
-    assert base["평균 VB ≥ 0.3 (매 Cycle 실측 가정)"] == 53
-    assert base["최대 날 VB ≥ 0.3 (매 Cycle 실측 가정)"] == 31
+    assert base["평균 VB ≥ 0.3 (매 Cycle 검사)"] == 53
+    assert base["최대 날 VB ≥ 0.3 (매 Cycle 검사)"] == 31
+    assert base["최대 날 VB ≥ 주의 기준 (매 Cycle 검사, 이상적)"] == 11
 
 
-def test_lifecycle_cost_formula():
+def test_lifecycle_loss_formula():
     df = pd.DataFrame({"cycle": [1, 2, 3], **{f"edge{i}_vbmax_mm": [0.1, 0.25, 0.35] for i in range(1, 5)}})
-    ctx = replace(get_scenario("S15"), tool_price=100, change_time_min=1, downtime_cost_per_min=10, part_value=1000)
+    ctx = replace(get_scenario("S15"), change_time_min=10, tool_purpose="finishing")
     th = {
-        "quality": {"vb_medium_mm": 0.2, "vb_high_mm": 0.3},
-        "economics": {"defect_probability": {"LOW": 0.01, "MEDIUM": 0.05, "HIGH": 0.3}, "inspection_time_min": 2},
+        "tool_purpose": {"finishing": {"vb_medium_mm": 0.2, "vb_high_mm": 0.3, "defect_loss": "rib"}},
+        "production": {"cycles_per_rib": 10, "cycle_time_min": 2.0, "inspection_time_min": 5},
+        "economics": {"defect_probability": {"LOW": 0.01, "MEDIUM": 0.05, "HIGH": 0.3}},
     }
     o = evaluate("t", 2, n_inspections=1, df=df, ctx=ctx, thresholds=th)
-    # (공구 100 + 교체 10 + 검사 20 + 불량 10 + 50) / 2 Cycle
-    assert o.cost_per_cycle == pytest.approx(95.0)
+    # 공구 수명 1회: 교체 10 + 검사 5 + 불량 (0.01 + 0.05) × 윙 리브 20분 = 16.2분, 2 Cycle → 윙 리브(10 Cycle)당 5배
+    assert o.loss_min_per_rib == pytest.approx(16.2 * 5)
+    assert o.tools_per_rib == pytest.approx(5.0)
     assert o.over_limit_cycles == 0
     assert evaluate("t", None, 0, df, ctx, th).over_limit_cycles == 1
+
+
+def test_presets_lead_to_different_decisions(df, model):
+    from src.simulation.production_sim import PRESETS
+
+    outcomes = {pid: run_system(df, p.context(), model=model) for pid, p in PRESETS.items()}
+    actions = {pid: (r.replace_cycle, r.decisions[-1].action) for pid, r in outcomes.items()}
+    assert actions["finishing"][1] == Action.REPLACE_NOW
+    assert actions["no_stock"][1] == Action.REPLACE_AFTER_JOB
+    assert actions["due_tight"][1] == Action.REPLACE_AFTER_JOB
+    assert actions["roughing"][0] > actions["finishing"][0]  # 황삭은 더 오래 쓴다
+    assert outcomes["roughing"].inspection_cycles == []  # 황삭은 검사 가치가 검사 시간보다 작다
+    assert outcomes["no_inspection"].inspection_cycles == []
 
 
 def test_increment_after_inspection_compares_measurements():

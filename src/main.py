@@ -1,7 +1,8 @@
 """데모: 공구 1개의 수명 동안 Multi-Agent 의사결정 흐름을 실행한다.
 
 실행:
-  python -m src.main --data qit [--scenario S15]        실제 QIT-CEMC 68 Cycle 재생 (검사 결과 = 실제 라벨)
+  python -m src.main --data qit [--preset finishing]    실제 QIT-CEMC 68 Cycle 재생 (검사 결과 = 실제 라벨)
+                                                       프리셋: finishing, roughing, no_stock, due_tight, no_inspection
   python -m src.main --data synthetic [--cycles 25]     합성 센서 데이터
 """
 import argparse
@@ -11,7 +12,7 @@ from src.data.synthetic import generate_tool_run
 from src.memory.history_store import HistoryStore
 from src.orchestrator.pipeline import MaintenancePipeline
 from src.schemas import Action, Decision, InspectionResult
-from src.simulation.production_sim import DEFAULT_SCENARIO, advance, get_scenario
+from src.simulation.production_sim import DEFAULT_PRESET, DEFAULT_SCENARIO, PRESETS, get_scenario
 
 
 def print_decision(decision: Decision, prefix: str = "") -> None:
@@ -20,12 +21,13 @@ def print_decision(decision: Decision, prefix: str = "") -> None:
     print(f"{prefix}    → {decision.reasons[0]}")
 
 
-def run_qit_demo(scenario_id: str = DEFAULT_SCENARIO) -> None:
+def run_qit_demo(preset_id: str = DEFAULT_PRESET) -> None:
     from src.evaluation.replay import run_system
     from src.models.tool_wear_model import load_features
 
-    ctx = get_scenario(scenario_id)
-    print(f"QIT-CEMC 실제 데이터 68 Cycle 재생 / 시나리오 {scenario_id} (MVP 시뮬레이션 입력)")
+    preset = PRESETS[preset_id]
+    ctx = preset.context()
+    print(f"QIT-CEMC 실제 데이터 68 Cycle 재생 / 프리셋 '{preset.name}' (MVP 시뮬레이션 입력)\n{preset.description}")
     print("센서 예측: 각 Cycle을 그 Cycle 앞뒤 5개를 학습에서 뺀 모델로 예측 / 검사 결과: 실제 라벨\n")
     last: list[Decision] = []
 
@@ -79,16 +81,16 @@ def run_demo(scenario_id: str = DEFAULT_SCENARIO, n_cycles: int = 25) -> None:
                 print(f"  - {reason}")
             break
 
-        ctx = advance(ctx)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--scenario", default=DEFAULT_SCENARIO)
     parser.add_argument("--cycles", type=int, default=25)
+    parser.add_argument("--preset", choices=list(PRESETS), default=DEFAULT_PRESET)
     parser.add_argument("--data", choices=("qit", "synthetic"), default="qit")
     args = parser.parse_args()
     if args.data == "qit":
-        run_qit_demo(args.scenario)
+        run_qit_demo(args.preset)
     else:
         run_demo(args.scenario, args.cycles)
