@@ -1,0 +1,50 @@
+"""Edge별 VBmax 예측 모델 인터페이스. (Track B)"""
+from pathlib import Path
+from typing import Protocol
+
+import numpy as np
+
+from src.config.settings import N_EDGES
+from src.schemas import SensorWindow
+
+
+class WearModel(Protocol):
+    def predict(self, features: dict[str, float], window: SensorWindow) -> tuple[np.ndarray, np.ndarray]:
+        """Edge 1~4의 (VBmax 예측값, 불확실성)을 mm 단위로 반환한다. 각각 shape (N_EDGES,)."""
+        ...
+
+
+class DummyWearModel:
+    """학습 모델(Track B)이 나오기 전까지 쓰는 임시 모델.
+
+    라벨이 있으면 라벨에 일정한 과소추정 오차와 노이즈를 섞어 예측을 흉내 내고,
+    없으면 누적 절삭 시간으로 평균 마모를 추정한다. 성능 평가에 사용하지 않는다.
+    """
+
+    def __init__(
+        self,
+        bias_mm: float = -0.03,
+        noise_mm: float = 0.005,
+        uncertainty_mm: float = 0.03,
+        fallback_rate_mm_min: float = 0.0085,
+        seed: int = 0,
+    ):
+        self.bias_mm = bias_mm
+        self.noise_mm = noise_mm
+        self.uncertainty_mm = uncertainty_mm
+        self.fallback_rate_mm_min = fallback_rate_mm_min
+        self.rng = np.random.default_rng(seed)
+
+    def predict(self, features: dict[str, float], window: SensorWindow) -> tuple[np.ndarray, np.ndarray]:
+        if window.vb_label_mm is not None:
+            base = np.asarray(window.vb_label_mm, dtype=float)
+        else:
+            base = np.full(N_EDGES, self.fallback_rate_mm_min * features["cut_time_min"])
+        vb = np.clip(base + self.bias_mm + self.rng.normal(0.0, self.noise_mm, N_EDGES), 0.0, None)
+        return vb, np.full(N_EDGES, self.uncertainty_mm)
+
+
+def load_wear_model(path: Path | None = None) -> WearModel:
+    if path is None:
+        return DummyWearModel()
+    raise NotImplementedError("학습된 모델 로딩은 Track B에서 구현 예정")
