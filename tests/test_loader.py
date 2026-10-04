@@ -75,3 +75,20 @@ def test_heavily_corrupted_vibration_is_treated_as_missing(fake_root):
     with pytest.warns(UserWarning, match="손상"):
         window = load_cycle(list_cycles(fake_root)[0], {})
     assert set(window.signals) == {"Fx", "Fy", "Fz", "Mz"}
+
+
+def test_uncalibrated_mv_vibration_is_treated_as_missing(fake_root):
+    path = fake_root / VIBRATION_DIR / "02-01-01.csv"
+    header = "time[x]," + ",".join(f"AI1-0{i}[mV]" for i in range(1, 9))
+    rows = [header] + ["t," + ",".join(["900.0"] * 8)] * 2000
+    path.write_text("\n".join(rows))
+    with pytest.warns(UserWarning, match="단위"):
+        window = load_cycle(list_cycles(fake_root)[2], {})
+    assert "vib_x" not in window.signals
+
+
+def test_vibration_columns_are_found_by_name():
+    from src.data.loader import vibration_columns
+
+    header = ["time[x]", "AI1-01[m/s²]", "AI1-02[m/s²]", "AI1-03[m/s²]", "AI1-07[Pa]"]
+    assert vibration_columns(header) == [1, 2, 3, 4]

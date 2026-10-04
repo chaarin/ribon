@@ -25,7 +25,13 @@ LABEL_FILE = "tool wear.xls"
 SAMPLING_RATE_HZ = 10_000.0
 
 FORCE_COLUMNS = {"Fx": "Fx", "Fy": "Fy", "Fz": "Fz", "Mz": "Mz"}
-VIBRATION_CHANNELS = ("vib_x", "vib_y", "vib_z", "sound")  # 원본 2~5번째 열 순서
+# 진동/소리 채널 이름 → (원본 열 이름 접두어, 기대 단위)
+VIBRATION_COLUMNS = {
+    "vib_x": ("AI1-01", "m/s"),
+    "vib_y": ("AI1-02", "m/s"),
+    "vib_z": ("AI1-03", "m/s"),
+    "sound": ("AI1-07", "Pa"),
+}
 
 # tool wear.xls: 앞 4행은 머리글, 측면 날 Edge 1~4의 VBmax 열 위치
 LABEL_HEADER_ROWS = 4
@@ -104,17 +110,35 @@ def read_force(path: Path) -> dict[str, np.ndarray]:
     return {name: df[col].to_numpy() for name, col in FORCE_COLUMNS.items()}
 
 
+def vibration_columns(header: list[str]) -> list[int]:
+    """머리글에서 진동 X/Y/Z, 소리 열 위치를 찾는다. 단위가 다르면 ValueError.
+
+    대부분의 파일은 `AI1-01[m/s²], AI1-02, AI1-03, AI1-07[Pa]` 4채널이지만,
+    마지막 4개 Cycle(65~68)은 8채널 `AI1-01[mV] ... AI1-08[mV]` 보정 전 전압이라 다른 Cycle과 비교할 수 없다.
+    """
+    positions = []
+    for name, (prefix, unit) in VIBRATION_COLUMNS.items():
+        matches = [i for i, h in enumerate(header) if str(h).strip().startswith(prefix)]
+        if not matches:
+            raise ValueError(f"{name} 채널({prefix}) 없음")
+        if unit not in str(header[matches[0]]):
+            raise ValueError(f"{name} 단위가 {unit}이 아님: {header[matches[0]]}")
+        positions.append(matches[0])
+    return positions
+
+
 def read_vibration(path: Path) -> dict[str, np.ndarray]:
     """원본 파일 일부가 손상돼 있다 (docs/qit_cemc_data_report.md):
     xlsx 2개(Cycle 21, 54)는 내부가 잘려 열 수 없고, csv 1개(Cycle 39)는 숫자 중간에 깨진 문자가 있다."""
     if path.suffix.lower() == ".xlsx":
-        df = pd.read_excel(path, usecols=[1, 2, 3, 4], engine="openpyxl")
+        header = pd.read_excel(path, nrows=0, engine="openpyxl").columns.tolist()
+        df = pd.read_excel(path, usecols=vibration_columns(header), engine="openpyxl")
     else:
-        # 열은 위치로 읽으므로 머리글의 글자 깨짐은 무시해도 된다
-        df = pd.read_csv(path, usecols=[1, 2, 3, 4], engine="c", encoding_errors="ignore", dtype=str)
-        # 깨진 값만 NaN으로 바꾸고 나머지는 살린다 (전처리에서 0으로 채우고 signal_quality에 반영됨)
+        header = pd.read_csv(path, nrows=0, encoding_errors="ignore").columns.tolist()
+        df = pd.read_csv(path, usecols=vibration_columns(header), engine="c", encoding_errors="ignore", dtype=str)
+        # 깨진 값만 NaN으로 바꾼다 (손상 비율이 크면 load_cycle에서 파일 전체를 결측 처리)
         df = df.apply(pd.to_numeric, errors="coerce")
-    return {name: df.iloc[:, i].to_numpy(dtype="float32") for i, name in enumerate(VIBRATION_CHANNELS)}
+    return {name: df.iloc[:, i].to_numpy(dtype="float32") for i, name in enumerate(VIBRATION_COLUMNS)}
 
 
 def load_cycle(files: CycleFiles, labels: dict[int, list[float]], tool_id: str = "QIT-CEMC") -> SensorWindow:
@@ -131,8 +155,8 @@ def load_cycle(files: CycleFiles, labels: dict[int, list[float]], tool_id: str =
     if files.vibration is not None:
         try:
             vibration = read_vibration(files.vibration)
-        except Exception as e:  # 손상된 진동 파일은 결측으로 처리하고 힘/토크만 사용한다
-            warnings.warn(f"Cycle {files.cycle} 진동 파일을 읽을 수 없어 결측 처리: {files.vibration.name} ({type(e).__name__})")
+        except Exception as e:  # 손상됐거나 단위가 다른 진동 파일은 결측으로 처리하고 힘/토크만 사용한다
+            warnings.warn(f"Cycle {files.cycle} 진동 파일을 쓸 수 없어 결측 처리: {files.vibration.name} ({type(e).__name__}: {e})")
         else:
             corrupt = max(float(np.mean(~np.isfinite(x))) for x in vibration.values())
             if corrupt > MAX_CORRUPT_FRACTION:
