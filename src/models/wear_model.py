@@ -1,5 +1,4 @@
-"""Edge별 VBmax 예측 모델 인터페이스. (Track B)"""
-from pathlib import Path
+"""마모 예측 모델 인터페이스와 합성 데이터용 모델. (Track B)"""
 from typing import Protocol
 
 import numpy as np
@@ -17,7 +16,7 @@ class WearModel(Protocol):
 
 
 class DummyWearModel:
-    """학습 모델(Track B)이 나오기 전까지 쓰는 임시 모델.
+    """합성 데이터 데모(python -m src.main --data synthetic)와 테스트용 모델. 실제 데이터에는 tool_wear_model을 쓴다.
 
     라벨이 있으면 라벨에 일정한 과소추정 오차와 노이즈를 섞어 예측을 흉내 내고,
     없으면 누적 절삭 시간으로 평균 마모를 추정한다. 성능 평가에 사용하지 않는다.
@@ -48,7 +47,6 @@ class DummyWearModel:
         return vb, np.full(N_EDGES, self.uncertainty_mm)
 
 
-def load_wear_model(path: Path | None = None) -> WearModel:
-    if path is None:
-        return DummyWearModel()
-    raise NotImplementedError("학습된 모델 로딩은 Track B에서 구현 예정")
+def load_wear_model() -> WearModel:
+    """모델을 지정하지 않았을 때의 기본값 (합성 데이터용). 실제 데이터 재생은 src.evaluation.replay가 학습 모델을 넣는다."""
+    return DummyWearModel()

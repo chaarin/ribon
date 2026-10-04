@@ -3,7 +3,6 @@
 - 각 Cycle은 미리 추출한 특징(data/features/qit_cemc_features.csv)으로 재생한다.
 - 시스템이 검사를 지시하면 그 Cycle의 실제 라벨(Edge 1~4 VBmax)을 현장 실측값으로 넣는다.
 """
-import math
 from dataclasses import dataclass, field
 
 import pandas as pd
@@ -87,6 +86,3 @@ def run_system(
             break
     return result
 
-
-def is_finite(x) -> bool:
-    return isinstance(x, (int, float)) and math.isfinite(x)

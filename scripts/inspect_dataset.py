@@ -132,7 +132,7 @@ def main() -> None:
         dir_stats[rel_dir][0] += 1
         dir_stats[rel_dir][1] += p.stat().st_size
 
-    out = [f"# QIT-CEMC 데이터 구조 보고서\n", f"- 경로: `{root}`", f"- 파일 {len(files)}개, 전체 {human(sum(s for _, s in dir_stats.values()))}\n"]
+    out = ["# QIT-CEMC 데이터 구조 보고서\n", f"- 경로: `{root}`", f"- 파일 {len(files)}개, 전체 {human(sum(s for _, s in dir_stats.values()))}\n"]
 
     out.append("## 확장자별\n\n| 확장자 | 개수 | 용량 |\n|---|---|---|")
     for ext, ps in sorted(by_ext.items(), key=lambda kv: -len(kv[1])):
