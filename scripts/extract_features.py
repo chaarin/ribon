@@ -26,7 +26,7 @@ def process_cycle(files: CycleFiles, labels: dict[int, list[float]]) -> dict:
     row.update(extract_features(preprocess(window), window))
     del row["cut_time_min"]  # 누적값은 전체 Cycle을 모은 뒤 계산한다
     row["signal_quality"] = min(channel_quality(window).values())
-    row["vibration_available"] = files.vibration is not None
+    row["vibration_available"] = "vib_x" in window.signals
     row.update(dict(zip(LABEL_COLUMNS, window.vb_label_mm or [None] * N_EDGES)))
     return row
 
@@ -44,13 +44,19 @@ def main() -> None:
     print(f"Cycle {len(cycles)}개, 프로세스 {args.workers}개", flush=True)
 
     start = time.time()
-    rows = []
+    rows, failed = [], []
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         futures = {pool.submit(process_cycle, c, labels): c for c in cycles}
         for future in as_completed(futures):
-            row = future.result()
+            files = futures[future]
+            try:
+                row = future.result()
+            except Exception as e:  # 한 Cycle 실패가 전체 추출을 멈추지 않게 한다
+                failed.append(files.cycle)
+                print(f"Cycle {files.cycle} 실패 ({files.force.name}, {files.vibration}): {type(e).__name__}: {e}", flush=True)
+                continue
             rows.append(row)
-            print(f"[{len(rows)}/{len(cycles)}] Cycle {row['cycle']} 완료 ({time.time() - start:.0f}초)", flush=True)
+            print(f"[{len(rows) + len(failed)}/{len(cycles)}] Cycle {row['cycle']} 완료 ({time.time() - start:.0f}초)", flush=True)
 
     rows.sort(key=lambda r: r["cycle"])
     elapsed = 0.0
@@ -65,6 +71,8 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(rows)
     print(f"\n{len(rows)}개 Cycle → {args.output} ({args.output.stat().st_size / 1024:.0f}KB, {time.time() - start:.0f}초)")
+    if failed:
+        raise SystemExit(f"실패한 Cycle: {sorted(failed)}")
 
 
 if __name__ == "__main__":

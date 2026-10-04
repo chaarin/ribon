@@ -64,3 +64,14 @@ def test_detrend_removes_drift_keeps_oscillation():
     out = detrend(drift + oscillation, int(0.1 * fs))
     assert abs(out.mean()) < 0.5
     assert out.std() == pytest.approx(oscillation.std(), rel=0.05)
+
+
+def test_heavily_corrupted_vibration_is_treated_as_missing(fake_root):
+    path = fake_root / VIBRATION_DIR / "01-26-01.csv"
+    lines = path.read_text().splitlines()
+    for i in range(1, len(lines), 3):  # 약 33%를 숫자로 읽을 수 없게 손상
+        lines[i] = "t,-0.16\x1355,x,y,z"
+    path.write_text("\n".join(lines))
+    with pytest.warns(UserWarning, match="손상"):
+        window = load_cycle(list_cycles(fake_root)[0], {})
+    assert set(window.signals) == {"Fx", "Fy", "Fz", "Mz"}

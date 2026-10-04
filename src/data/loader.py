@@ -8,6 +8,7 @@
 파일 이름의 날짜·순번 순서가 Cycle 1~68 순서다. 순번은 '1'과 '01'처럼 표기가 섞여 있어 숫자로 비교한다.
 """
 import re
+import warnings
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +35,10 @@ SIDE_VBMAX_COLUMNS = (1, 4, 7, 10)
 # 절삭 중에는 날이 하나씩 맞물릴 때마다 힘·진동이 크게 출렁이고, 공회전·정지 중에는 거의 변하지 않는다.
 ACTIVE_WINDOW_S = 0.1
 ACTIVE_RATIO = 0.1
+
+# 진동 파일에서 숫자로 읽을 수 없는 값이 이 비율을 넘으면 파일 전체를 결측 처리한다.
+# Cycle 39 파일은 약 24%가 손상돼 있고, 숫자로 읽힌 나머지 값도 비정상(소리 RMS 1e29 등)이었다.
+MAX_CORRUPT_FRACTION = 0.05
 
 NAME_PATTERN = re.compile(r"^(\d{2})-(\d{2})-(\d+)$")
 
@@ -95,15 +100,20 @@ def active_slice(signal: np.ndarray, fs: float = SAMPLING_RATE_HZ) -> slice:
 
 
 def read_force(path: Path) -> dict[str, np.ndarray]:
-    df = pd.read_csv(path, sep="\t", usecols=list(FORCE_COLUMNS), dtype="float32", engine="c")
+    df = pd.read_csv(path, sep="\t", usecols=list(FORCE_COLUMNS), dtype="float32", engine="c", encoding_errors="ignore")
     return {name: df[col].to_numpy() for name, col in FORCE_COLUMNS.items()}
 
 
 def read_vibration(path: Path) -> dict[str, np.ndarray]:
+    """원본 파일 일부가 손상돼 있다 (docs/qit_cemc_data_report.md):
+    xlsx 2개(Cycle 21, 54)는 내부가 잘려 열 수 없고, csv 1개(Cycle 39)는 숫자 중간에 깨진 문자가 있다."""
     if path.suffix.lower() == ".xlsx":
         df = pd.read_excel(path, usecols=[1, 2, 3, 4], engine="openpyxl")
     else:
-        df = pd.read_csv(path, usecols=[1, 2, 3, 4], engine="c")
+        # 열은 위치로 읽으므로 머리글의 글자 깨짐은 무시해도 된다
+        df = pd.read_csv(path, usecols=[1, 2, 3, 4], engine="c", encoding_errors="ignore", dtype=str)
+        # 깨진 값만 NaN으로 바꾸고 나머지는 살린다 (전처리에서 0으로 채우고 signal_quality에 반영됨)
+        df = df.apply(pd.to_numeric, errors="coerce")
     return {name: df.iloc[:, i].to_numpy(dtype="float32") for i, name in enumerate(VIBRATION_CHANNELS)}
 
 
@@ -117,10 +127,20 @@ def load_cycle(files: CycleFiles, labels: dict[int, list[float]], tool_id: str =
     cut = active_slice(magnitude)
     signals = {name: x[cut] for name, x in force.items()}
 
+    vibration = None
     if files.vibration is not None:
-        vibration = read_vibration(files.vibration)
-        vib_cut = active_slice(vibration["vib_x"])
-        signals.update({name: x[vib_cut] for name, x in vibration.items()})
+        try:
+            vibration = read_vibration(files.vibration)
+        except Exception as e:  # 손상된 진동 파일은 결측으로 처리하고 힘/토크만 사용한다
+            warnings.warn(f"Cycle {files.cycle} 진동 파일을 읽을 수 없어 결측 처리: {files.vibration.name} ({type(e).__name__})")
+        else:
+            corrupt = max(float(np.mean(~np.isfinite(x))) for x in vibration.values())
+            if corrupt > MAX_CORRUPT_FRACTION:
+                warnings.warn(f"Cycle {files.cycle} 진동 파일 손상 {corrupt:.0%} → 결측 처리: {files.vibration.name}")
+                vibration = None
+        if vibration is not None:
+            vib_cut = active_slice(np.nan_to_num(vibration["vib_x"]))
+            signals.update({name: x[vib_cut] for name, x in vibration.items()})
 
     label = labels.get(files.cycle)
     return SensorWindow(
