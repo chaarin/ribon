@@ -29,8 +29,9 @@ class MasterAgent(BaseAgent):
         wear_th = self.thresholds["wear"]
         can_recheck = state.rechecks_this_cycle < self.thresholds["decision"]["max_rechecks_per_cycle"]
         worst = wear.edge(wear.worst_edge)
+        edge_texts = [f"E{e.edge_id} {e.vb_max_mm:.3f}" + ("(실측)" if e.measured else "") for e in wear.edges]
         evidence = [
-            f"Edge별 VBmax(mm): {', '.join(f'E{e.edge_id} {e.vb_max_mm:.3f}{"(실측)" if e.measured else ""}' for e in wear.edges)}",
+            f"Edge별 VBmax(mm): {', '.join(edge_texts)}",
             f"날 간 차이 {wear.wear_difference_mm:.3f} mm, 편마모 지수 {wear.uneven_index:.2f} ({'편마모' if wear.uneven_flag else '정상'}), "
             f"최근 증가 최대 Edge {wear.fastest_edge}",
             *wear.notes,

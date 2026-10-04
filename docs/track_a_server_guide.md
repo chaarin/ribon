@@ -18,33 +18,50 @@
 
 ## 0. 준비 (처음 한 번)
 
+서버 접속 방법은 학교에서 받은 「GPU서버 접속 가이드(vscode)」 PDF를 따른다.
+VSCode로 접속한 뒤 **Terminal → New Terminal**을 열면 그 터미널이 서버에서 실행된다.
+
 1. GitHub 저장소 초대를 수락한다 (저장소 관리자에게 GitHub 아이디 전달).
-2. 서버에서 코드를 받고 환경을 만든다.
+2. 서버에서 코드를 받는다. 비공개 저장소라 비밀번호 대신 **Personal Access Token**을 입력해야 한다.
+   - GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens**
+   - Repository access: `ribon`만 선택, Contents: Read and write, 만료일: 대회 종료일
+   - 팀 계정은 여러 명이 같이 쓰므로 토큰을 서버에 저장하지 말고(`credential.helper store` 사용 금지) 필요할 때마다 입력한다.
 
 ```bash
+cd ~
 git clone https://github.com/chaarin/ribon
 cd ribon
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/pip install scipy h5py openpyxl npTDMS   # 데이터 형식 조사용 (필요한 것만 설치돼도 됨)
-.venv/bin/pytest -q                                # 32 passed 나오면 정상
+git config user.name "본인 이름"          # 공용 계정이라 저장소 단위로 설정
+git config user.email "본인 GitHub 이메일"
 ```
 
-비공개 저장소라 `git clone`할 때 비밀번호 대신 GitHub Personal Access Token이 필요할 수 있다.
-(GitHub → Settings → Developer settings → Personal access tokens → `repo` 권한)
-
-3. 원본 데이터를 `data/raw/` 아래에 두거나 링크를 건다. 이미 다른 곳에 풀어 놨다면 옮기지 말고 링크만 건다.
+3. conda 환경을 만든다. 서버 규칙상 base 환경에는 설치하지 않는다.
 
 ```bash
-ln -s /서버의/QIT-CEMC/경로 data/raw/QIT-CEMC
+conda create -n ribon python=3.11 -y
+conda activate ribon
+pip install -r requirements.txt
+pip install scipy h5py openpyxl npTDMS     # 데이터 형식 조사용
+pytest -q                                  # 32 passed 나오면 정상
 ```
 
----
+이후 접속할 때마다 `conda activate ribon`부터 실행한다. 아래 명령의 `python`은 이 환경의 python이다.
+
+4. 팀원이 올려 둔 원본 데이터를 찾아 `data/raw/`에 **링크만** 건다. 40GB를 복사하지 않는다.
+
+```bash
+find ~ -maxdepth 4 \( -iname "*qit*" -o -iname "*cemc*" -o -iname "*milling*" \) 2>/dev/null
+mkdir -p data/raw
+ln -s /찾은/데이터/폴더 data/raw/QIT-CEMC
+ls data/raw/QIT-CEMC | head
+```
+
+아직 `.rar` 압축 상태라면 바로 풀지 말고, 먼저 `df -h ~`로 남은 용량(약 40GB 필요)을 확인하고 데이터를 올린 팀원과 상의한다.
 
 ## 1. 데이터 구조 조사 (10분)
 
 ```bash
-.venv/bin/python -m scripts.inspect_dataset data/raw/QIT-CEMC
+python -m scripts.inspect_dataset data/raw/QIT-CEMC
 git checkout -b track-a-data
 git add docs/qit_cemc_structure.md
 git commit -m "Add QIT-CEMC structure report"
@@ -88,7 +105,7 @@ git push -u origin track-a-data
 
 수정 가능: src/data/loader.py, tests/test_loader.py, requirements.txt (필요한 패키지 추가)
 수정 금지: src/schemas/, src/agents/, 그 외 파일
-완료 조건: .venv/bin/pytest -q 전체 통과
+완료 조건: pytest -q 전체 통과 (conda 환경 ribon, Python 3.11)
 ```
 
 ---
@@ -96,7 +113,9 @@ git push -u origin track-a-data
 ## 3. 특징 추출
 
 ```bash
-.venv/bin/python -m scripts.extract_features --root data/raw/QIT-CEMC
+# 오래 걸리므로 VSCode 연결이 끊겨도 계속 돌도록 nohup으로 실행
+nohup python -m scripts.extract_features --root data/raw/QIT-CEMC > extract.log 2>&1 &
+tail -f extract.log     # 진행 상황 확인 (Ctrl+C는 보기만 멈춤, 작업은 계속됨)
 git add src/data/loader.py tests/test_loader.py data/features/qit_cemc_features.csv requirements.txt
 git commit -m "Implement QIT-CEMC loader and extract cycle features"
 git push
